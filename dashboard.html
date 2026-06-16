@@ -1,0 +1,65 @@
+<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Báo cáo kho — Lãnh đạo (Cheng/Kalle)</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>
+<style>
+:root{color-scheme:light}*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#eef1f6;color:#1f2933;padding:18px;max-width:1240px;margin:0 auto}
+h1{font-size:22px;color:#1F4E78}.sub{color:#667085;font-size:13px;margin:2px 0 16px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:18px}
+.kpi{border-radius:14px;padding:16px 18px;color:#fff}
+.k1{background:linear-gradient(135deg,#2E75B6,#1F4E78)}.k2{background:linear-gradient(135deg,#1abc9c,#138d75)}
+.k3{background:linear-gradient(135deg,#9b59b6,#6c3483)}.k4{background:linear-gradient(135deg,#e67e22,#c0560c)}
+.kpi .lbl{font-size:12px;opacity:.9}.kpi .big{font-size:28px;font-weight:700;margin:4px 0}.kpi .small{font-size:11px;opacity:.85}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.card{background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 4px rgba(16,24,40,.06)}
+.card h3{font-size:14px;color:#1F4E78;margin-bottom:10px}
+.chartbox{position:relative;height:240px}
+.alerts{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:6px 0 16px}
+.al{border-radius:12px;padding:14px 16px;color:#fff}.al .n{font-size:26px;font-weight:700}.al .t{font-size:12px;opacity:.92}
+.ar{background:linear-gradient(135deg,#e74c3c,#c0392b)}.ao{background:linear-gradient(135deg,#e67e22,#b9770e)}.ag{background:linear-gradient(135deg,#7f8c8d,#566573)}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{padding:7px 8px;border-bottom:1px solid #eef0f4;text-align:right}th{color:#667085;font-weight:600;font-size:11px;text-align:right}
+th:first-child,td:first-child{text-align:left}td.n{text-align:left}
+.tag{font-size:10px;border-radius:5px;padding:1px 5px;margin-left:4px}.ch{background:#E3F0FB;color:#1F4E78}.ka{background:#F0E6F7;color:#6c3483}
+.foot{color:#98a2b3;font-size:11px;text-align:center;margin-top:14px}
+@media(max-width:820px){.grid{grid-template-columns:1fr}.alerts{grid-template-columns:1fr}}
+</style></head><body>
+<h1>📊 Báo cáo kho — Bảng điều hành (Cheng / Kalle)</h1>
+<div class="sub" id="sub"></div>
+<div class="kpis" id="kpis"></div>
+<div class="grid">
+<div class="card"><h3>Tồn kho theo kho</h3><div class="chartbox"><canvas id="cKho"></canvas></div></div>
+<div class="card"><h3>Tồn kho theo hãng</h3><div class="chartbox"><canvas id="cHang"></canvas></div></div>
+</div>
+<div class="card" style="margin-bottom:16px"><h3>Tồn kho theo phân loại (top 10)</h3><div class="chartbox" style="height:280px"><canvas id="cCat"></canvas></div></div>
+<div class="grid">
+<div class="card"><h3>🔥 Top 10 bán chạy (30 ngày)</h3><div class="chartbox" style="height:300px"><canvas id="cSell"></canvas></div></div>
+<div class="card"><h3>⏳ Số ngày tồn bình quân (vòng quay)</h3><div style="text-align:center;padding:40px 0"><div style="font-size:54px;font-weight:800;color:#1F4E78" id="vongquay"></div><div style="color:#667085">ngày — toàn kho bán hết tồn hiện tại</div><div style="margin-top:12px;color:#667085;font-size:13px">Bán bình quân <b id="bday"></b> sp/ngày</div></div></div>
+</div>
+<h3 style="color:#1F4E78;font-size:16px;margin:6px 0 8px">⚠️ Cảnh báo rủi ro</h3>
+<div class="alerts" id="alerts"></div>
+<div class="grid">
+<div class="card"><h3>🔴 Sắp hết hàng (gấp nhất)</h3><table id="tHet"></table></div>
+<div class="card"><h3>🐌 Tồn đọng / bán chậm (tồn lớn, >90 ngày)</h3><table id="tDong"></table></div>
+</div>
+<div class="foot" id="foot"></div>
+<script>
+var D={"n_ma": 346, "ton_pos": 450740, "ton_ac": 95937, "ton_ml1": 137890, "ton_ml2": 210069, "by_hang": {"Kalle": 6932, "—": 0, "Cheng": 443808}, "by_cat": [["Dưỡng ít", 124870], ["Ziemlich", 108840], ["Dưỡng vừa", 62325], ["3 gói bọt", 44062], ["Dưỡng nhiều", 42006], ["5 gói bọt", 32401], ["10 gói", 23895], ["Dụng cụ nhuộm", 4643], ["Sữa tắm", 1973], ["Nước hoa 10ml", 1237]], "tot_rate": 12531.5, "days_inv": 36.0, "n_het": 107, "n_am": 16, "n_dong": 131, "top_sell": [{"name": "Ủ ngẫu nhiên (gói)", "hang": "Cheng", "q30": 49304, "rate": 3236.7}, {"name": "Trợ oxy 9% (lọ)", "hang": "Cheng", "q30": 15214, "rate": 1042.6}, {"name": "Trợ oxy 6% (lọ)", "hang": "Cheng", "q30": 8862, "rate": 607.9}, {"name": "Full dụng cụ nhuộm tóc (bộ)", "hang": "Cheng", "q30": 7201, "rate": 495.7}, {"name": "Tinh dầu 10ml (lọ)", "hang": "Cheng", "q30": 4872, "rate": 446.8}, {"name": "3 gói nhuộm bọt - trà lạnh (túi)", "hang": "Cheng", "q30": 3666, "rate": 252.0}, {"name": "Nâu trà lạnh - dưỡng ít + 6% (tuýp", "hang": "Cheng", "q30": 3583, "rate": 235.3}, {"name": "3 gói nhuộm bọt - nâu tây (túi)", "hang": "Cheng", "q30": 3530, "rate": 278.3}, {"name": "Nâu tây lạnh - dưỡng ít + 9% (tuýp", "hang": "Cheng", "q30": 2787, "rate": 215.6}, {"name": "Trợ oxy 3% (lọ)", "hang": "Cheng", "q30": 2660, "rate": 180.0}], "top_het": [{"name": "Bst vial ngẫu nhiên (hộp)", "hang": "Kalle", "tong": 5, "days": 0.2}, {"name": "5 gói nhuộm bọt - nâu tây (hộp)", "hang": "Cheng", "tong": 30, "days": 0.4}, {"name": "Tẩy ziemlich to (hộp)", "hang": "Cheng", "tong": 48, "days": 0.8}, {"name": "5 gói nhuộm bọt - nâu cam (hộp)", "hang": "Cheng", "tong": 48, "days": 0.8}, {"name": "Nước Hoa Blue Shirt - 30ML (lọ)", "hang": "Kalle", "tong": 2, "days": 0.9}, {"name": "3 gói nhuộm bọt - nâu tây (túi)", "hang": "Cheng", "tong": 330, "days": 1.2}, {"name": "Nâng nhẹ ziemlich (hộp)", "hang": "Cheng", "tong": 66, "days": 1.3}, {"name": "10 gói nhuộm bọt - chocolate (hộp)", "hang": "Cheng", "tong": 81, "days": 2.4}, {"name": "3 gói nhuộm bọt - hạt dẻ (túi)", "hang": "Cheng", "tong": 184, "days": 3.1}, {"name": "Nâu cam gỗ - dưỡng ít + 6% (tuýp)", "hang": "Cheng", "tong": 36, "days": 3.1}, {"name": "Nước Hoa LADYKILLER - 10ML (lọ)", "hang": "Kalle", "tong": 54, "days": 3.4}, {"name": "Box Dark Beauty 10ml + Sữa tắm Dar", "hang": "Kalle", "tong": 53, "days": 4.0}], "top_dong": [{"name": "Nâu đen - dưỡng ít + 3% (tuýp)", "hang": "Cheng", "tong": 20361, "days": 152}, {"name": "Ủ ziemlich hồng (gói)", "hang": "Cheng", "tong": 20140, "days": 615}, {"name": "Ủ ziemlich tím (gói)", "hang": "Cheng", "tong": 16771, "days": 771}, {"name": "Đen tuyền - dưỡng ít + 3% (tuýp)", "hang": "Cheng", "tong": 10114, "days": 196}, {"name": "Bát nhuộm tóc (cái)", "hang": "Cheng", "tong": 9474, "days": 278}, {"name": "Nâu đen - dưỡng nhiều (hộp)", "hang": "Cheng", "tong": 9279, "days": 398}, {"name": "3 gói nhuộm bọt - đen tuyền (túi)", "hang": "Cheng", "tong": 8444, "days": 178}, {"name": "Nâu trà đen - dưỡng ít + 9% (tuýp)", "hang": "Cheng", "tong": 6336, "days": 155}, {"name": "5 gói nhuộm bọt - nâu đen (hộp)", "hang": "Cheng", "tong": 5721, "days": 109}, {"name": "5 gói nhuộm bọt - đen tuyền (hộp)", "hang": "Cheng", "tong": 5253, "days": 497}, {"name": "Phủ bạc nâu sáng - dưỡng vừa (hộp)", "hang": "Cheng", "tong": 4696, "days": 5479}, {"name": "Nâu coffee - dưỡng vừa (hộp)", "hang": "Cheng", "tong": 4331, "days": 2021}], "updated": "16/06/2026 08:14"};
+function f(n){return (n==null)?'-':n.toLocaleString('vi-VN');}
+document.getElementById('sub').textContent='Cập nhật '+D.updated+' · Nguồn: Base kế toán (Lark) — danh mục kho + xuất kho';
+document.getElementById('foot').textContent='Vòng quay = Tổng tồn ÷ bán/ngày. Tốc độ bán/ngày = MAX(tuần · tháng). Tồn âm = kho có thể chưa cập nhật nhập.';
+var kp=[['k1','Tổng SL tồn (dương)',f(D.ton_pos),D.n_ma+' mã hàng'],['k2','Bán bình quân/ngày',f(D.tot_rate),'sp xuất kho'],['k3','Vòng quay tồn kho',D.days_inv,'ngày'],['k4','Mã cần chú ý',f(D.n_het+D.n_am),'sắp hết/âm']];
+document.getElementById('kpis').innerHTML=kp.map(function(x){return '<div class=\"kpi '+x[0]+'\"><div class=lbl>'+x[1]+'</div><div class=big>'+x[2]+'</div><div class=small>'+x[3]+'</div></div>';}).join('');
+document.getElementById('vongquay').textContent=D.days_inv;
+document.getElementById('bday').textContent=f(D.tot_rate);
+var al=[['ar',D.n_het,'Mã sắp/đã hết (dưới tối thiểu 1,5 tháng)'],['ao',D.n_am,'Mã tồn ÂM (oversold/chưa cập nhật)'],['ag',D.n_dong,'Mã tồn đọng / bán chậm (>90 ngày)']];
+document.getElementById('alerts').innerHTML=al.map(function(x){return '<div class=\"al '+x[0]+'\"><div class=n>'+f(x[1])+'</div><div class=t>'+x[2]+'</div></div>';}).join('');
+function btag(h){return h==='Cheng'?'<span class=\"tag ch\">Cheng</span>':(h==='Kalle'?'<span class=\"tag ka\">Kalle</span>':'');}
+document.getElementById('tHet').innerHTML='<tr><th>Sản phẩm</th><th>Tồn</th><th>Còn (ngày)</th></tr>'+D.top_het.map(function(r){return '<tr><td class=n>'+r.name+btag(r.hang)+'</td><td>'+f(r.tong)+'</td><td>'+r.days+'</td></tr>';}).join('');
+document.getElementById('tDong').innerHTML='<tr><th>Sản phẩm</th><th>Tồn</th><th>Còn (ngày)</th></tr>'+D.top_dong.map(function(r){return '<tr><td class=n>'+r.name+btag(r.hang)+'</td><td>'+f(r.tong)+'</td><td>'+(r.days==null?'~∞':f(r.days))+'</td></tr>';}).join('');
+new Chart(document.getElementById('cKho'),{type:'doughnut',data:{labels:['Âu Cơ','Mê Linh 1','Mê Linh 2'],datasets:[{data:[D.ton_ac,D.ton_ml1,D.ton_ml2],backgroundColor:['#2E75B6','#9b59b6','#e67e22']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
+var hl=Object.keys(D.by_hang).filter(function(k){return k!=='—';});
+new Chart(document.getElementById('cHang'),{type:'bar',data:{labels:hl,datasets:[{data:hl.map(function(k){return D.by_hang[k];}),backgroundColor:['#2E75B6','#9b59b6']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});
+new Chart(document.getElementById('cCat'),{type:'bar',data:{labels:D.by_cat.map(function(x){return x[0];}),datasets:[{data:D.by_cat.map(function(x){return x[1];}),backgroundColor:'#1abc9c'}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});
+new Chart(document.getElementById('cSell'),{type:'bar',data:{labels:D.top_sell.map(function(x){return x.name;}),datasets:[{label:'Bán 30 ngày',data:D.top_sell.map(function(x){return x.q30;}),backgroundColor:'#e74c3c'}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});
+</script></body></html>
