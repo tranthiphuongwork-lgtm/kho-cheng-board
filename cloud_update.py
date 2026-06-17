@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 # Chạy trên GitHub Actions 20:00 VN mỗi ngày: đồng bộ Gobox->Lark, dựng board, gửi cảnh báo Lark.
-import os,json,urllib.request,urllib.parse,datetime,math
+import os,json,re,urllib.request,urllib.parse,datetime,math
 from collections import defaultdict
 LARK_HOST='https://open.larksuite.com'; GB='https://api.gobox.asia'
 APP_ID=os.environ['LARK_APP_ID']; APP_SECRET=os.environ['LARK_APP_SECRET']; BASE=os.environ['LARK_APP_TOKEN']
 GCID=os.environ['GOBOX_CLIENT_ID']; GSEC=os.environ['GOBOX_CLIENT_SECRET']; WEBHOOK=os.environ['LARK_WEBHOOK']
 T_SP='tbl7PSQh3Lq5Tlxy'; T_XK='tblIHtLsM4QTMMQJ'; T_CK='tblylArl4EL4AvrX'
-WID='32'; COVER=45; TRIO=['1082704','1082694','1082699']; MLP='Mê Linh In Hàng Loạt'
+WID='32'; COVER=45; MELINH_RPT='https://melinh-lark-relay.hungnv21295.workers.dev'; MELINH_TOKEN='melinh-share-2026'; TRIO=['1082704','1082694','1082699']; MLP='Mê Linh In Hàng Loạt'
 
 def ltoken():
     r=urllib.request.Request(LARK_HOST+'/open-apis/auth/v3/tenant_access_token/internal',data=json.dumps({'app_id':APP_ID,'app_secret':APP_SECRET}).encode(),headers={'Content-Type':'application/json'},method='POST')
@@ -43,6 +43,34 @@ def gb_all(tok,path,params):
         if p>80:break
     return out
 
+def sku_gsku(tok):
+    m={}
+    for it in lsearch(tok,T_SP,['G SKU','SKU']):
+        f=it['fields']; g=gt(f.get('G SKU')); sk=gt(f.get('SKU'))
+        if g and sk: m[str(sk).strip().lower()]=str(g)
+    return m
+def giacong(ngay):
+    # đọc Section 1B (NVL -> gia công sẵn) từ báo cáo Mê Linh 2; trả {sku: qty}
+    url=f'{MELINH_RPT}/nvl-report/{ngay}?token={MELINH_TOKEN}'
+    try:
+        html=urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'c'}),timeout=40).read().decode('utf-8','ignore')
+    except Exception: return {}
+    i=html.find('SECTION 1B'); j=html.find('SECTION 2')
+    if i<0 or j<0: return {}
+    seg=html[i:j]
+    tb=re.search(r'<tbody>(.*?)</tbody>',seg,re.S)
+    if not tb: return {}
+    out={}
+    for tr in re.findall(r'<tr>(.*?)</tr>',tb.group(1),re.S):
+        if 'Chưa có gia công' in tr: continue
+        tds=re.findall(r'<td[^>]*>(.*?)</td>',tr,re.S)
+        if len(tds)<4: continue
+        sku=re.sub(r'<[^>]+>','',tds[0]).strip().lower()
+        try: qty=float(re.sub(r'[^0-9.]','',re.sub(r'<[^>]+>','',tds[3])) or 0)
+        except: qty=0
+        if sku and qty>0: out[sku]=out.get(sku,0)+qty
+    return out
+
 def sync_gobox(ltok):
     NGAY=(datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7))).date()-datetime.timedelta(days=1)).isoformat()
     gtok=gbtoken()
@@ -60,6 +88,14 @@ def sync_gobox(ltok):
         g=str(r.get('gsku')); q=r.get('quantity',0); kho='Kho Mê Linh 2' if c2p.get(r['code'])==MLP else 'Kho Âu Cơ'
         if kho=='Kho Mê Linh 2': agg[g][1]+=q
         else: agg[g][0]+=q
+    try:
+        gc=giacong(NGAY); smap=sku_gsku(ltok); added=0
+        for sku,qty in gc.items():
+            g=smap.get(sku)
+            if g: agg[g][1]+=qty; added+=qty
+        if added: print('  + gia công Mê Linh 2:',int(added),'đơn vị')
+    except Exception as e:
+        print('  gia công skip:',e)
     if not agg: return NGAY,0
     vn=datetime.timezone(datetime.timedelta(hours=7))
     DATE_MS=int(datetime.datetime.strptime(NGAY,'%Y-%m-%d').replace(tzinfo=vn).timestamp()*1000)
