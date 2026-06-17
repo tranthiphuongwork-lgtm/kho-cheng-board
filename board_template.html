@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chuyển kho & mua hàng — Cheng/Kalle</title>
+<style>
+:root{color-scheme:light}*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f4f6fb;color:#1f2933;padding:16px;max-width:1300px;margin:0 auto}
+h1{font-size:20px;color:#1F4E78;margin-bottom:4px}.sub{color:#667085;font-size:13px;margin-bottom:14px}
+.tabs{display:flex;gap:8px;margin-bottom:14px}
+.tab{padding:10px 16px;border-radius:10px 10px 0 0;background:#e7ebf3;color:#475467;cursor:pointer;font-weight:600;font-size:14px}
+.tab.on{background:#fff;color:#1F4E78;box-shadow:0 -1px 4px rgba(16,24,40,.05)}
+.cards{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.card{flex:1;min-width:170px;border-radius:14px;padding:14px 16px;color:#fff}
+.card.t{background:linear-gradient(135deg,#1abc9c,#138d75)}.card.b{background:linear-gradient(135deg,#e74c3c,#c0392b)}
+.card.k{background:linear-gradient(135deg,#9b59b6,#6c3483)}.card.c{background:linear-gradient(135deg,#2E75B6,#1F4E78)}
+.card .lbl{font-size:12px;opacity:.9}.card .big{font-size:26px;font-weight:700;margin:3px 0}.card .small{font-size:11px;opacity:.85}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center}.bar .g{font-size:12px;color:#98a2b3}
+input,select{padding:8px 10px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px}input{flex:1;min-width:140px}
+.chip{padding:7px 12px;border-radius:20px;border:1px solid #b0b7c3;background:#fff;color:#475467;cursor:pointer;font-size:13px}
+.chip.on{background:#2E75B6;color:#fff;border-color:#2E75B6}.chip.kalle.on{background:#9b59b6;border-color:#9b59b6}
+.chip.zi.on{background:#1F4E78;border-color:#1F4E78}.chip.buy.on{background:#c0392b;border-color:#c0392b}
+.tfbox{background:#eafaf4;border:1px solid #b7e8d6;border-radius:10px;padding:8px 10px;margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tfbox .lab{font-size:12px;color:#138d75;font-weight:700}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(16,24,40,.06)}
+th,td{padding:8px 9px;font-size:12.5px;text-align:right;border-bottom:1px solid #eef0f4;vertical-align:top}
+th{background:#2E75B6;color:#fff;white-space:nowrap;font-size:11.5px}th:first-child,td:first-child{text-align:left}
+td.name{text-align:left;font-weight:500}tr:hover td{background:#f8fafc}
+.tag{display:inline-block;font-size:10px;border-radius:6px;padding:1px 6px;margin-left:5px}
+.tag.zi{background:#D9E1F2;color:#1F4E78}.tag.ch{background:#E3F0FB;color:#1F4E78}.tag.ka{background:#F0E6F7;color:#6c3483}
+.tf{text-align:left;color:#138d75;font-weight:600;line-height:1.5}.tf .src{color:#475467;font-weight:400}.tf .hl{background:#fff3cd;border-radius:4px;padding:0 3px}
+.buy{font-weight:700;color:#c0392b;font-size:14px}.neg{color:#c0392b}.muted{color:#b0b7c3}
+.route{margin:18px 0 0}.route h3{font-size:15px;color:#fff;background:linear-gradient(135deg,#1abc9c,#138d75);padding:10px 14px;border-radius:10px 10px 0 0;display:flex;justify-content:space-between}
+.route table{border-radius:0 0 10px 10px}.route td.qty{font-weight:700;color:#138d75;font-size:15px}.route td .box{font-weight:600;color:#1F4E78}
+.route .stt{color:#98a2b3;width:38px;text-align:center}.route tr.subtot td{background:#eafaf4;font-weight:700;color:#138d75}
+.route tr.cathead td{background:#eef3fb;font-weight:700;color:#1F4E78;font-size:12px}
+.foot{color:#98a2b3;font-size:11px;margin-top:14px;text-align:center}@media(max-width:820px){.hidem{display:none}}
+</style></head><body>
+<h1>🔄 Chuyển kho & mua hàng — Cheng / Kalle</h1>
+<div class="sub">Ưu tiên chuyển kho từ kho thừa về kho thiếu (giữ kho nguồn ≥ tối thiểu), thiếu mới mua. Tồn tối thiểu = tốc độ bán [MAX(tuần 7 ngày · tháng T5)] × số ngày dự trữ: <b>Cheng __CC__ ngày · Kalle __CK__ ngày (1,5 tháng)</b>. Chuyển kho &amp; mua đều TRÒN THÙNG. Ủ ngẫu nhiên+hồng+tím gộp.</div>
+<div class="tabs">
+<div class="tab on" id="tabT" onclick="setView('transfer')">🔄 Phiếu chuyển kho</div>
+<div class="tab" id="tabF" onclick="setView('full')">📊 Bảng phân tích đầy đủ</div>
+</div>
+<div class="tfbox">
+<span class="lab">Lọc:</span>
+<label style="font-size:12px">Kho xuất <select id="src" onchange="render()"><option value="all">Tất cả</option><option value="Mê Linh 1">Mê Linh 1</option><option value="Mê Linh 2">Mê Linh 2</option><option value="Âu Cơ">Âu Cơ</option></select></label>
+<span style="color:#138d75;font-weight:700">→</span>
+<label style="font-size:12px">Kho nhập <select id="dst" onchange="render()"><option value="all">Tất cả</option><option value="Âu Cơ">Âu Cơ</option><option value="Mê Linh 2">Mê Linh 2</option></select></label>
+<span class="g" style="margin-left:8px">Hãng:</span>
+<select id="brand" onchange="render()"><option value="all">Tất cả</option><option value="Cheng">Cheng</option><option value="Kalle">Kalle</option></select>
+<input id="q" placeholder="🔎 Tìm sản phẩm..." style="min-width:140px">
+</div>
+<div id="cardsWrap"></div>
+<div id="content"></div>
+<div class="foot">ÂC=Âu Cơ, ML1=Mê Linh 1, ML2=Mê Linh 2. Phiếu chuyển kho gom theo tuyến → phân loại, có cột số thùng — chụp gửi kho trực tiếp. Cập nhật __DATE__ · Nguồn: Lark.</div>
+<script>
+var DATA=__DATA__;var view='transfer';
+function ab(s){return s==='Âu Cơ'?'ÂC':(s==='Mê Linh 1'?'ML1':'ML2');}
+function fmt(n){return n.toLocaleString('vi-VN');}
+function tmatch(t,src,dst){return (src==='all'||t[0]===src)&&(dst==='all'||t[1]===dst);}
+function setView(v){view=v;document.getElementById('tabT').classList.toggle('on',v==='transfer');document.getElementById('tabF').classList.toggle('on',v==='full');render();}
+function baseFilter(){var q=document.getElementById('q').value.toLowerCase();var br=document.getElementById('brand').value;return DATA.filter(function(x){return (br==='all'||x.hang===br)&&x.name.toLowerCase().indexOf(q)>=0;});}
+function render(){var src=document.getElementById('src').value,dst=document.getElementById('dst').value;var base=baseFilter();if(view==='transfer')rT(base,src,dst);else rF(base,src,dst);}
+function rT(base,src,dst){
+ var routes={},grand=0;
+ base.forEach(function(x){x.transfers.forEach(function(t){if(!tmatch(t,src,dst))return;var key=t[0]+' → '+t[1];(routes[key]=routes[key]||[]).push({name:x.name,hang:x.hang,cat:x.cat,qty:t[2],qc:x.qc});grand+=t[2];});});
+ var order=['Mê Linh 1 → Âu Cơ','Mê Linh 2 → Âu Cơ','Mê Linh 1 → Mê Linh 2','Âu Cơ → Mê Linh 2'];
+ var keys=Object.keys(routes).sort(function(a,b){var ia=order.indexOf(a),ib=order.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib);});
+ document.getElementById('cardsWrap').innerHTML='<div class="cards"><div class="card t"><div class="lbl">🔄 Tổng SL chuyển kho</div><div class="big">'+fmt(grand)+'</div><div class="small">'+keys.length+' tuyến</div></div></div>';
+ if(!keys.length){document.getElementById('content').innerHTML='<p class=muted style="padding:20px;text-align:center">Không có phiếu chuyển kho khớp bộ lọc.</p>';return;}
+ var html='';
+ keys.forEach(function(k){
+  var items=routes[k];var sub=items.reduce(function(s,i){return s+i.qty;},0);
+  var cats={};items.forEach(function(it){var c=it.cat||'Khác';(cats[c]=cats[c]||[]).push(it);});
+  var ck=Object.keys(cats).sort(function(a,b){return cats[b].reduce(function(s,i){return s+i.qty;},0)-cats[a].reduce(function(s,i){return s+i.qty;},0);});
+  html+='<div class="route"><h3><span>🔄 '+k+'</span><span>'+fmt(sub)+' sp · '+items.length+' mã · '+ck.length+' phân loại</span></h3><table><thead><tr><th class=stt>#</th><th>Sản phẩm</th><th>Số lượng chuyển</th><th>Số thùng</th></tr></thead><tbody>';
+  var idx=0;
+  ck.forEach(function(c){
+   var ci=cats[c].sort(function(a,b){return b.qty-a.qty;});var csub=ci.reduce(function(s,i){return s+i.qty;},0);
+   var cbox=ci.reduce(function(s,i){return s+(i.qc>0?Math.round(i.qty/i.qc):0);},0);
+   html+='<tr class=cathead><td></td><td>📂 '+c+' <span style="font-weight:400;color:#98a2b3">('+ci.length+' mã)</span></td><td>'+fmt(csub)+'</td><td>'+fmt(cbox)+'</td></tr>';
+   ci.forEach(function(it){idx++;var bt=it.hang==='Cheng'?'<span class="tag ch">Cheng</span>':(it.hang==='Kalle'?'<span class="tag ka">Kalle</span>':'');var bx=it.qc>0?'<span class=box>'+fmt(Math.round(it.qty/it.qc))+'</span>':'<span class=muted>-</span>';html+='<tr><td class=stt>'+idx+'</td><td class=name>'+it.name+bt+'</td><td class=qty>'+fmt(it.qty)+'</td><td>'+bx+'</td></tr>';});
+  });
+  var rbox=items.reduce(function(s,i){return s+(i.qc>0?Math.round(i.qty/i.qc):0);},0);
+  html+='<tr class=subtot><td></td><td>TỔNG TUYẾN</td><td>'+fmt(sub)+'</td><td>'+fmt(rbox)+'</td></tr></tbody></table></div>';
+ });
+ document.getElementById('content').innerHTML=html;
+}
+function rF(base,src,dst){
+ var tfA=(src!=='all'||dst!=='all');
+ var r=base.filter(function(x){if(!tfA)return true;for(var i=0;i<x.transfers.length;i++)if(tmatch(x.transfers[i],src,dst))return true;return false;});
+ r.sort(function(a,b){return b.buy-a.buy;});
+ var stf=0,sbuy=0;r.forEach(function(x){sbuy+=x.buy;x.transfers.forEach(function(t){if(!tfA||tmatch(t,src,dst))stf+=t[2];});});
+ document.getElementById('cardsWrap').innerHTML='<div class="cards"><div class="card t"><div class="lbl">🔄 Chuyển kho</div><div class="big">'+fmt(stf)+'</div><div class="small">'+r.length+' sản phẩm</div></div><div class="card b"><div class="lbl">🛒 Cần MUA</div><div class="big">'+fmt(sbuy)+'</div><div class="small">sau khi chuyển kho</div></div></div>';
+ var h='<table><thead><tr><th>Sản phẩm</th><th class=hidem>Dự trữ</th><th class=hidem>Bán/ng ÂC (tuần/tháng)</th><th class=hidem>Tồn ÂC</th><th class=hidem>Tồn ML1</th><th class=hidem>Tồn ML2</th><th class=hidem>TT ÂC</th><th class=hidem>TT ML2</th><th>🔄 Chuyển kho</th><th>🛒 MUA</th></tr></thead><tbody>';
+ h+=r.map(function(x){
+  var bt=x.hang==='Cheng'?'<span class="tag ch">Cheng</span>':(x.hang==='Kalle'?'<span class="tag ka">Kalle</span>':'');
+  var zt=x.cat==='Ziemlich'?'<span class="tag zi">Ziemlich</span>':'';
+  function ton(v){return '<span class="'+(v<0?'neg':'')+'">'+fmt(v)+'</span>';}
+  var tf=x.transfers.length?x.transfers.map(function(t){var hl=(tfA&&tmatch(t,src,dst));return '<div class="'+(hl?'hl':'')+'"><span class=src>'+ab(t[0])+'→'+ab(t[1])+'</span> '+fmt(t[2])+'</div>';}).join(''):'<span class=muted>—</span>';
+  var buy=x.buy>0?'<span class=buy>'+fmt(x.buy)+'</span>'+(x.boxes?'<div class=muted style="font-size:10px">'+fmt(x.boxes)+'thùng×'+fmt(x.qc)+'</div>':''):'<span class=muted>—</span>';
+  return '<tr><td class=name>'+x.name+bt+zt+'</td><td class=hidem>'+x.cover+'ng</td><td class=hidem><span style="color:#1F4E78;font-weight:600">'+fmt(x.ac_wk)+'</span> / <span style="color:#9b59b6">'+fmt(x.ac_mo)+'</span></td><td class=hidem>'+ton(x.ac_t)+'</td><td class=hidem>'+fmt(x.ml1_t)+'</td><td class=hidem>'+fmt(x.ml2_t)+'</td><td class=hidem>'+fmt(x.min_ac)+'</td><td class=hidem>'+fmt(x.min_ml2)+'</td><td class=tf>'+tf+'</td><td>'+buy+'</td></tr>';
+ }).join('');
+ document.getElementById('content').innerHTML=h+'</tbody></table>';
+}
+document.getElementById('q').addEventListener('input',render);render();
+</script></body></html>
