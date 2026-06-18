@@ -85,7 +85,7 @@ def parse_report(ngay):
         dau,gc,used,left=[int(x.replace(',','')) for x in nums]; s2.append((sku,c[1],dau,gc,used,left))
     return a,b,s2
 def sync_gobox(ltok):
-    NGAY=(datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7))).date()-datetime.timedelta(days=1)).isoformat()
+    NGAY=datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7))).date().isoformat()
     vn=datetime.timezone(datetime.timedelta(hours=7)); DATE_MS=int(datetime.datetime.strptime(NGAY,'%Y-%m-%d').replace(tzinfo=vn).timestamp()*1000)
     # --- Âu Cơ từ Gobox (giữ nguyên) ---
     gtok=gbtoken()
