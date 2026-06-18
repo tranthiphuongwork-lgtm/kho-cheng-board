@@ -264,6 +264,43 @@ def notify_pending(ngay,pend,final=False):
     try: urllib.request.urlopen(urllib.request.Request(WEBHOOK,data=json.dumps(card).encode(),headers={'Content-Type':'application/json'},method='POST'),timeout=30)
     except Exception as e: print('notify_pending loi:',e)
 
+DYE_PL={'Dưỡng ít','Dưỡng vừa','Dưỡng nhiều','3 gói bọt','5 gói bọt','10 gói','Màu lẻ'}
+def send_day_reports(tok,ngay):
+    DATE_MS=int(datetime.datetime.strptime(ngay,'%Y-%m-%d').replace(tzinfo=datetime.timezone(datetime.timedelta(hours=7))).timestamp()*1000)
+    inv={}
+    for it in lsearch(tok,T_SP,['G SKU','Tên sản phẩm','Hãng','Phân loại','Tồn kho Âu Cơ','Kho Mê Linh 1','Kho Mê Linh 2']):
+        f=it['fields'];g=gt(f.get('G SKU'))
+        if not g: continue
+        inv[str(g)]={'name':gt(f.get('Tên sản phẩm')) or g,'hang':(gt(f.get('Hãng')) or '—').strip(),'pl':(gt(f.get('Phân loại')) or '').strip(),'ton':fv(f.get('Tồn kho Âu Cơ'))+fv(f.get('Kho Mê Linh 1'))+fv(f.get('Kho Mê Linh 2'))}
+    from collections import defaultdict as _dd
+    day=_dd(float);s7=_dd(float);s30=_dd(float)
+    for it in lsearch(tok,T_XK,['G SKU','Số lượng','Ngày đóng gói']):
+        f=it['fields'];g=gt(f.get('G SKU'));q=f.get('Số lượng') or 0;dt=f.get('Ngày đóng gói')
+        if not g or not isinstance(dt,(int,float)): continue
+        g=str(g)
+        if dt==DATE_MS: day[g]+=q
+        dd=(DATE_MS-dt)/86400000
+        if 0<=dd<7: s7[g]+=q
+        if 0<=dd<30: s30[g]+=q
+    rate=lambda g:max(s7.get(g,0)/7,s30.get(g,0)/30)
+    chg=sorted([(g,day[g]) for g in day if inv.get(g,{}).get('hang')=='Cheng' and inv.get(g,{}).get('pl') in DYE_PL],key=lambda x:-x[1])[:10]
+    kal=sorted([(g,day[g]) for g in day if inv.get(g,{}).get('hang')=='Kalle'],key=lambda x:-x[1])[:10]
+    risk=[]
+    for g,v in inv.items():
+        if g in TRIO or v['hang'] not in ('Cheng','Kalle') or v['pl']=='NVL': continue
+        r=rate(g)
+        if r>0 and 0<v['ton']<r*3: risk.append((g,r,v['ton'],v['ton']/r))
+    risk=sorted(risk,key=lambda x:-x[1])[:10]
+    dd='/'.join(reversed(ngay.split('-')))
+    def lines(lst): return '\n'.join(f"{i}. {inv[g]['name']} — **{int(q):,}** (tồn {int(inv[g]['ton']):,})" for i,(g,q) in enumerate(lst,1)) or '_(không có)_'
+    body1=f"**🏆 Top bán chạy — {dd}**\n\n__Cheng (thuốc nhuộm):__\n{lines(chg)}\n\n__Kalle:__\n{lines(kal)}"
+    rlines='\n'.join(f"{i}. 🔴 {inv[g]['name']} — bán ~**{r:.0f}/ngày** · tồn **{int(t):,}** · còn ~**{dl:.1f} ngày**" for i,(g,r,t,dl) in enumerate(risk,1)) or '_(không có mã nào dưới 3 ngày)_'
+    body2=f"**⚠️ Sắp hết — không đủ bán 3 ngày ({dd})**\nTop theo tốc độ bán, tồn hiện không đủ 3 ngày tới:\n\n{rlines}"
+    for body,title,tmpl in [(body1,'🏆 Top bán chạy hôm nay','blue'),(body2,'⚠️ Sắp hết trong 3 ngày','orange')]:
+        card={'msg_type':'interactive','card':{'config':{'wide_screen_mode':True},'header':{'title':{'tag':'plain_text','content':title},'template':tmpl},'elements':[{'tag':'div','text':{'tag':'lark_md','content':body}}]}}
+        try: urllib.request.urlopen(urllib.request.Request(WEBHOOK,data=json.dumps(card).encode(),headers={'Content-Type':'application/json'},method='POST'),timeout=30)
+        except Exception as e: print('send_day_reports loi:',e)
+
 def notify_done(ngay,d):
     dd='/'.join(reversed(ngay.split('-')))
     body=(f"**✅ Đã hoàn tất nhập/xuất kho — {dd}**\n"
@@ -290,5 +327,7 @@ if __name__=='__main__':
         else: print('Còn',det['pending'],'đơn -> im lặng, thử lại sau 30p.')
     else:
         notify_done(ngay,det)
+        try: send_day_reports(ltok,ngay)
+        except Exception as e: print('reports loi:',e)
         rows=compute(ltok); build_index(rows); alert(ltok,rows)
         print('Xuất kho + board + cảnh báo xong. Mã đề xuất:',len(rows))
