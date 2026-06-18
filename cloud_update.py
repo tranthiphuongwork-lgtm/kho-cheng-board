@@ -84,11 +84,20 @@ def parse_report(ngay):
         if not sku or not all(re.match(r'^[+-]?\d+$',x.replace(',','').strip()) for x in nums): continue
         dau,gc,used,left=[int(x.replace(',','')) for x in nums]; s2.append((sku,c[1],dau,gc,used,left))
     return a,b,s2
+def gb_pending(gtok,ngay):
+    # đếm phiếu tạo trong ngày chưa đóng gói (status < 200); >=200 = đã đóng gói/bàn giao, 499 = hủy
+    wp=gb_all(gtok,'/open/api/warehouse-pickings',{'warehouse_id':WID,'type':3,'source':3,'start_created_date':ngay,'end_created_date':ngay,'limit':1000})
+    return sum(1 for r in wp if isinstance(r.get('status'),int) and r['status']<200)
+
 def sync_gobox(ltok):
     NGAY=datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7))).date().isoformat()
     vn=datetime.timezone(datetime.timedelta(hours=7)); DATE_MS=int(datetime.datetime.strptime(NGAY,'%Y-%m-%d').replace(tzinfo=vn).timestamp()*1000)
     # --- Âu Cơ từ Gobox (giữ nguyên) ---
     gtok=gbtoken()
+    pend=gb_pending(gtok,NGAY)
+    if pend>0:
+        notify_pending(NGAY,pend)
+        return NGAY,{'pending':pend,'auco':0,'ml2':0,'ck':0,'unmapped':0,'total':0}
     lines=gb_all(gtok,'/open/api/reports/warehouse-export-by-sku',{'start_date':NGAY,'end_date':NGAY,'warehouse_id':WID,'limit':1000})
     wp=gb_all(gtok,'/open/api/warehouse-pickings',{'warehouse_id':WID,'type':3,'source':3,'start_done_date':NGAY,'end_done_date':NGAY,'limit':1000,'include[]':'processer'})
     def pn(r):
@@ -139,7 +148,7 @@ def sync_gobox(ltok):
     auco_n=sum(1 for q in auco.values() if q>0); ml2_n=len(xk_recs)-auco_n
     print(f'  ÂuCơ={auco_n} | ML2={ml2_n} rec | ChuyểnKho(NhậpCombo)={len(ck_recs)} rec | chưa map={len(unmapped)}')
     if unmapped: print('  chưa map:',unmapped[:10])
-    return NGAY,{'auco':auco_n,'ml2':ml2_n,'ck':len(ck_recs),'unmapped':len(unmapped),'total':len(xk_recs)+len(ck_recs)}
+    return NGAY,{'pending':0,'auco':auco_n,'ml2':ml2_n,'ck':len(ck_recs),'unmapped':len(unmapped),'total':len(xk_recs)+len(ck_recs)}
 
 def shopee_rates(tok):
     out=lsearch(tok,T_CK,['Kho nhập','Kho xuất','G SKU','Số lượng','Ngày'])
@@ -239,6 +248,15 @@ def alert(tok,rows):
     card={'msg_type':'interactive','card':{'config':{'wide_screen_mode':True},'header':{'title':{'tag':'plain_text','content':'⚠️ Cảnh báo hết hàng — Cheng'},'template':'red'},'elements':[{'tag':'div','text':{'tag':'lark_md','content':content}}]}}
     urllib.request.urlopen(urllib.request.Request(WEBHOOK,data=json.dumps(card).encode(),headers={'Content-Type':'application/json'},method='POST'),timeout=30)
 
+def notify_pending(ngay,pend):
+    dd='/'.join(reversed(ngay.split('-')))
+    body=(f"**⏳ Chưa xuất kho — {dd}**\n"
+          f"Gobox còn **{pend} đơn chưa đóng gói xong**.\n"
+          f"Hệ thống **tạm hoãn** tự động xuất kho. Đóng hết đơn rồi báo để chạy lại.")
+    card={'msg_type':'interactive','card':{'config':{'wide_screen_mode':True},'header':{'title':{'tag':'plain_text','content':'⏳ Còn đơn chưa đóng'},'template':'orange'},'elements':[{'tag':'div','text':{'tag':'lark_md','content':body}}]}}
+    try: urllib.request.urlopen(urllib.request.Request(WEBHOOK,data=json.dumps(card).encode(),headers={'Content-Type':'application/json'},method='POST'),timeout=30)
+    except Exception as e: print('notify_pending loi:',e)
+
 def notify_done(ngay,d):
     dd='/'.join(reversed(ngay.split('-')))
     body=(f"**✅ Đã hoàn tất nhập/xuất kho — {dd}**\n"
@@ -255,7 +273,10 @@ if __name__=='__main__':
     ltok=ltoken()
     ngay,det=sync_gobox(ltok)
     print('Đồng bộ ngày',ngay,':',det)
-    notify_done(ngay,det)
+    if det.get('pending'):
+        print('Còn',det['pending'],'đơn chưa đóng -> hoãn xuất kho, đã báo Lark.')
+    else:
+        notify_done(ngay,det)
     rows=compute(ltok)
     build_index(rows)
     alert(ltok,rows)
