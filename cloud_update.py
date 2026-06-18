@@ -304,7 +304,7 @@ body{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:#0f
  <div class="card"><h2>🏆 Top bán chạy <span class="tag c">CHENG · thuốc nhuộm</span></h2><div id="cheng"></div></div>
  <div class="card"><h2>🏆 Top bán chạy <span class="tag k">KALLE</span></h2><div id="kalle"></div></div>
 </div>
-<div class="card risk" style="margin-top:16px"><h2>⚠️ Sắp hết trong 3 ngày tới</h2><div class="empty" style="margin-bottom:6px">Tốc độ bán cao, tồn hiện không đủ bán 3 ngày — cần nhập gấp.</div><div id="risk"></div></div>
+<div class="card risk" style="margin-top:16px"><h2>⚠️ Sắp hết trong 1 tuần tới</h2><div class="empty" style="margin-bottom:6px">Tốc độ bán cao, tồn hiện không đủ bán 1 tuần — cần nhập thêm.</div><div id="risk"></div></div>
 <div class="foot">Tự động cập nhật sau mỗi lần xuất kho · Kho Cheng/Kalle</div>
 <script>
 var D=__DATA__;
@@ -317,7 +317,7 @@ function sellers(id,arr,cls){var el=document.getElementById(id);if(!arr.length){
 sellers('cheng',D.cheng,'bc');sellers('kalle',D.kalle,'bk');
 var rk=document.getElementById('risk');
 if(!D.risk.length){rk.innerHTML='<div class=empty>Không có mã nào dưới 3 ngày 🎉</div>'}else{
- rk.innerHTML=D.risk.map(function(x){var c=x.days<1?'cr':(x.days<2?'wn':'ye');
+ rk.innerHTML=D.risk.map(function(x){var c=x.days<2?'cr':(x.days<4?'wn':'ye');
   return '<div class="ri '+c+'"><div class=nm>'+x.name+'</div><div class=meta>bán ~<b>'+fmt(x.rate)+'</b>/ngày · tồn <b>'+fmt(x.ton)+'</b></div><div class="dd '+c+'">'+x.days+'<div style="font-size:9px;font-weight:600;color:#9fb0d0">ngày</div></div></div>'}).join('')}
 </script></body></html>'''
     html=tpl.replace('__DATE__',data['date']).replace('__DATA__',json.dumps(data,ensure_ascii=False))
@@ -346,12 +346,12 @@ def send_day_reports(tok,ngay):
     for g,v in inv.items():
         if g in TRIO or v.get('tb') or v['hang'] not in ('Cheng','Kalle') or v['pl']=='NVL': continue
         r=rate(g)
-        if r>0 and 0<v['ton']<r*3: risk.append({'name':v['name'],'rate':round(r,1),'ton':int(v['ton']),'days':round(v['ton']/r,1)})
+        if r>0 and 0<v['ton']<r*7: risk.append({'name':v['name'],'rate':round(r,1),'ton':int(v['ton']),'days':round(v['ton']/r,1)})
     risk=sorted(risk,key=lambda x:-x['rate'])[:10]
     dd='/'.join(reversed(ngay.split('-')))
     build_daily_report({'date':dd,'cheng':chg,'kalle':kal,'risk':risk})
     nrisk=len(risk)
-    body=f"**📊 Báo cáo bán hàng — {dd}**\nTop bán chạy Cheng (thuốc nhuộm) & Kalle, kèm **{nrisk} mã sắp hết trong 3 ngày**.\n\n👉 [Xem board chi tiết]({BOARD_URL})"
+    body=f"**📊 Báo cáo bán hàng — {dd}**\nTop bán chạy Cheng (thuốc nhuộm) & Kalle, kèm **{nrisk} mã sắp hết trong 1 tuần**.\n\n👉 [Xem board chi tiết]({BOARD_URL})"
     card={'msg_type':'interactive','card':{'config':{'wide_screen_mode':True},'header':{'title':{'tag':'plain_text','content':'📊 Báo cáo bán hàng'},'template':'blue'},'elements':[{'tag':'div','text':{'tag':'lark_md','content':body}},{'tag':'action','actions':[{'tag':'button','text':{'tag':'plain_text','content':'📊 Mở board'},'type':'primary','url':BOARD_URL}]}]}}
     try: urllib.request.urlopen(urllib.request.Request(WEBHOOK,data=json.dumps(card).encode(),headers={'Content-Type':'application/json'},method='POST'),timeout=30)
     except Exception as e: print('send_day_reports loi:',e)
