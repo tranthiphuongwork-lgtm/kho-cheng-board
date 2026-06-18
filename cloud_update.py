@@ -265,6 +265,63 @@ def notify_pending(ngay,pend,final=False):
     except Exception as e: print('notify_pending loi:',e)
 
 DYE_PL={'Dưỡng ít','Dưỡng vừa','Dưỡng nhiều','3 gói bọt','5 gói bọt','10 gói','Màu lẻ'}
+BOARD_URL='https://tranthiphuongwork-lgtm.github.io/kho-cheng-board/daily_report.html'
+def build_daily_report(data):
+    tpl=r'''<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Báo cáo bán hàng __DATE__</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:#0f1729;color:#e6edf6;padding:18px;max-width:1100px;margin:0 auto}
+.head{background:linear-gradient(135deg,#2563eb,#7c3aed);border-radius:16px;padding:20px 24px;margin-bottom:18px}
+.head h1{font-size:22px;font-weight:800}.head .sub{opacity:.85;font-size:13px;margin-top:4px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+.card{background:#16203a;border:1px solid #243352;border-radius:14px;padding:16px}
+.card h2{font-size:15px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px}
+.tag.c{background:#1e3a8a;color:#bfdbfe}.tag.k{background:#5b21b6;color:#ddd6fe}
+.row{margin-bottom:10px}
+.row .r1{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px}
+.row .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .rk{display:inline-block;width:20px;color:#7d8db0;font-weight:700}
+.row .qty{font-weight:800;font-size:14px}
+.row .tn{color:#7d8db0;font-size:11px;white-space:nowrap}
+.bar{height:6px;border-radius:6px;margin-top:4px;background:#243352;overflow:hidden}
+.bar>i{display:block;height:100%;border-radius:6px}
+.bc{background:linear-gradient(90deg,#3b82f6,#60a5fa)}.bk{background:linear-gradient(90deg,#8b5cf6,#a78bfa)}
+.risk h2{color:#fbbf24}
+.ri{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;background:#1b1430;border-left:4px solid #f59e0b;margin-bottom:8px}
+.ri.cr{border-color:#ef4444;background:#2a1320}.ri.wn{border-color:#f59e0b}.ri.ye{border-color:#eab308}
+.ri .nm{flex:1;font-size:13px;font-weight:600}
+.ri .meta{font-size:11px;color:#9fb0d0;text-align:right;white-space:nowrap}
+.ri .dd{font-weight:800;font-size:15px;text-align:center}
+.dd.cr{color:#f87171}.dd.wn{color:#fbbf24}.dd.ye{color:#fde047}
+.empty{color:#7d8db0;font-size:13px;padding:8px}
+.foot{text-align:center;color:#5b6b8c;font-size:11px;margin-top:16px}
+</style></head><body>
+<div class="head"><h1>📊 Báo cáo bán hàng — Kho</h1><div class="sub">Ngày __DATE__ · Top bán chạy & cảnh báo sắp hết hàng</div></div>
+<div class="grid">
+ <div class="card"><h2>🏆 Top bán chạy <span class="tag c">CHENG · thuốc nhuộm</span></h2><div id="cheng"></div></div>
+ <div class="card"><h2>🏆 Top bán chạy <span class="tag k">KALLE</span></h2><div id="kalle"></div></div>
+</div>
+<div class="card risk" style="margin-top:16px"><h2>⚠️ Sắp hết trong 3 ngày tới</h2><div class="empty" style="margin-bottom:6px">Tốc độ bán cao, tồn hiện không đủ bán 3 ngày — cần nhập gấp.</div><div id="risk"></div></div>
+<div class="foot">Tự động cập nhật sau mỗi lần xuất kho · Kho Cheng/Kalle</div>
+<script>
+var D=__DATA__;
+function fmt(n){return n.toLocaleString('vi-VN')}
+function sellers(id,arr,cls){var el=document.getElementById(id);if(!arr.length){el.innerHTML='<div class=empty>Không có dữ liệu</div>';return}
+ var mx=Math.max.apply(null,arr.map(function(x){return x.qty}))||1;
+ el.innerHTML=arr.map(function(x,i){var w=Math.max(4,Math.round(x.qty/mx*100));
+  return '<div class=row><div class=r1><div class=nm><span class=rk>'+(i+1)+'</span>'+x.name+'</div><div class=qty>'+fmt(x.qty)+'</div></div>'+
+  '<div class=bar><i class="'+cls+'" style="width:'+w+'%"></i></div><div class=tn>tồn '+fmt(x.ton)+'</div></div>'}).join('')}
+sellers('cheng',D.cheng,'bc');sellers('kalle',D.kalle,'bk');
+var rk=document.getElementById('risk');
+if(!D.risk.length){rk.innerHTML='<div class=empty>Không có mã nào dưới 3 ngày 🎉</div>'}else{
+ rk.innerHTML=D.risk.map(function(x){var c=x.days<1?'cr':(x.days<2?'wn':'ye');
+  return '<div class="ri '+c+'"><div class=nm>'+x.name+'</div><div class=meta>bán ~<b>'+fmt(x.rate)+'</b>/ngày · tồn <b>'+fmt(x.ton)+'</b></div><div class="dd '+c+'">'+x.days+'<div style="font-size:9px;font-weight:600;color:#9fb0d0">ngày</div></div></div>'}).join('')}
+</script></body></html>'''
+    html=tpl.replace('__DATE__',data['date']).replace('__DATA__',json.dumps(data,ensure_ascii=False))
+    open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'daily_report.html'),'w',encoding='utf-8').write(html)
 def send_day_reports(tok,ngay):
     DATE_MS=int(datetime.datetime.strptime(ngay,'%Y-%m-%d').replace(tzinfo=datetime.timezone(datetime.timedelta(hours=7))).timestamp()*1000)
     inv={}
@@ -283,23 +340,21 @@ def send_day_reports(tok,ngay):
         if 0<=dd<7: s7[g]+=q
         if 0<=dd<30: s30[g]+=q
     rate=lambda g:max(s7.get(g,0)/7,s30.get(g,0)/30)
-    chg=sorted([(g,day[g]) for g in day if inv.get(g,{}).get('hang')=='Cheng' and inv.get(g,{}).get('pl') in DYE_PL],key=lambda x:-x[1])[:10]
-    kal=sorted([(g,day[g]) for g in day if inv.get(g,{}).get('hang')=='Kalle'],key=lambda x:-x[1])[:10]
+    chg=[{'name':inv[g]['name'],'qty':int(day[g]),'ton':int(inv[g]['ton'])} for g in sorted(day,key=lambda x:-day[x]) if inv.get(g,{}).get('hang')=='Cheng' and inv.get(g,{}).get('pl') in DYE_PL][:10]
+    kal=[{'name':inv[g]['name'],'qty':int(day[g]),'ton':int(inv[g]['ton'])} for g in sorted(day,key=lambda x:-day[x]) if inv.get(g,{}).get('hang')=='Kalle'][:10]
     risk=[]
     for g,v in inv.items():
         if g in TRIO or v['hang'] not in ('Cheng','Kalle') or v['pl']=='NVL': continue
         r=rate(g)
-        if r>0 and 0<v['ton']<r*3: risk.append((g,r,v['ton'],v['ton']/r))
-    risk=sorted(risk,key=lambda x:-x[1])[:10]
+        if r>0 and 0<v['ton']<r*3: risk.append({'name':v['name'],'rate':round(r,1),'ton':int(v['ton']),'days':round(v['ton']/r,1)})
+    risk=sorted(risk,key=lambda x:-x['rate'])[:10]
     dd='/'.join(reversed(ngay.split('-')))
-    def lines(lst): return '\n'.join(f"{i}. {inv[g]['name']} — **{int(q):,}** (tồn {int(inv[g]['ton']):,})" for i,(g,q) in enumerate(lst,1)) or '_(không có)_'
-    body1=f"**🏆 Top bán chạy — {dd}**\n\n__Cheng (thuốc nhuộm):__\n{lines(chg)}\n\n__Kalle:__\n{lines(kal)}"
-    rlines='\n'.join(f"{i}. 🔴 {inv[g]['name']} — bán ~**{r:.0f}/ngày** · tồn **{int(t):,}** · còn ~**{dl:.1f} ngày**" for i,(g,r,t,dl) in enumerate(risk,1)) or '_(không có mã nào dưới 3 ngày)_'
-    body2=f"**⚠️ Sắp hết — không đủ bán 3 ngày ({dd})**\nTop theo tốc độ bán, tồn hiện không đủ 3 ngày tới:\n\n{rlines}"
-    for body,title,tmpl in [(body1,'🏆 Top bán chạy hôm nay','blue'),(body2,'⚠️ Sắp hết trong 3 ngày','orange')]:
-        card={'msg_type':'interactive','card':{'config':{'wide_screen_mode':True},'header':{'title':{'tag':'plain_text','content':title},'template':tmpl},'elements':[{'tag':'div','text':{'tag':'lark_md','content':body}}]}}
-        try: urllib.request.urlopen(urllib.request.Request(WEBHOOK,data=json.dumps(card).encode(),headers={'Content-Type':'application/json'},method='POST'),timeout=30)
-        except Exception as e: print('send_day_reports loi:',e)
+    build_daily_report({'date':dd,'cheng':chg,'kalle':kal,'risk':risk})
+    nrisk=len(risk)
+    body=f"**📊 Báo cáo bán hàng — {dd}**\nTop bán chạy Cheng (thuốc nhuộm) & Kalle, kèm **{nrisk} mã sắp hết trong 3 ngày**.\n\n👉 [Xem board chi tiết]({BOARD_URL})"
+    card={'msg_type':'interactive','card':{'config':{'wide_screen_mode':True},'header':{'title':{'tag':'plain_text','content':'📊 Báo cáo bán hàng'},'template':'blue'},'elements':[{'tag':'div','text':{'tag':'lark_md','content':body}},{'tag':'action','actions':[{'tag':'button','text':{'tag':'plain_text','content':'📊 Mở board'},'type':'primary','url':BOARD_URL}]}]}}
+    try: urllib.request.urlopen(urllib.request.Request(WEBHOOK,data=json.dumps(card).encode(),headers={'Content-Type':'application/json'},method='POST'),timeout=30)
+    except Exception as e: print('send_day_reports loi:',e)
 
 def notify_done(ngay,d):
     dd='/'.join(reversed(ngay.split('-')))
