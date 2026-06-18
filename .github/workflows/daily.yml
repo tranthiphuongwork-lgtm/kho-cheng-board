@@ -1,7 +1,7 @@
-name: Daily kho update (20:00 VN)
+name: Daily kho update (18:30 VN)
 on:
   schedule:
-    - cron: '0 13 * * *'
+    - cron: '30 11 * * *'
   workflow_dispatch:
 permissions:
   contents: write
