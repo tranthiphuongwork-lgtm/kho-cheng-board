@@ -313,7 +313,7 @@ function sellers(id,arr,cls){var el=document.getElementById(id);if(!arr.length){
  var mx=Math.max.apply(null,arr.map(function(x){return x.qty}))||1;
  el.innerHTML=arr.map(function(x,i){var w=Math.max(4,Math.round(x.qty/mx*100));
   return '<div class=row><div class=r1><div class=nm><span class=rk>'+(i+1)+'</span>'+x.name+'</div><div class=qty>'+fmt(x.qty)+'</div></div>'+
-  '<div class=bar><i class="'+cls+'" style="width:'+w+'%"></i></div><div class=tn>tồn '+fmt(x.ton)+(x.days!=null?' · đủ bán ~<b style="color:'+(x.days<7?'#f87171':(x.days<14?'#fbbf24':'#9fb0d0'))+'">'+x.days+' ngày</b>':' · đủ bán lâu')+'</div></div>'}).join('')}
+  '<div class=bar><i class="'+cls+'" style="width:'+w+'%"></i></div><div class=tn>tồn '+fmt(x.ton)+(x.days==null?' · đủ bán lâu':(x.days<0?' · <b style="color:#f87171">tồn âm</b>':' · đủ bán ~<b style="color:'+(x.days<7?'#f87171':(x.days<14?'#fbbf24':'#9fb0d0'))+'">'+x.days+' ngày</b>'))+'</div></div>'}).join('')}
 sellers('cheng',D.cheng,'bc');sellers('kalle',D.kalle,'bk');
 var rk=document.getElementById('risk');
 if(!D.risk.length){rk.innerHTML='<div class=empty>Không có mã nào dưới 3 ngày 🎉</div>'}else{
