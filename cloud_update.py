@@ -92,12 +92,13 @@ def gb_pending(gtok,ngay):
 def sync_gobox(ltok):
     NGAY=datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7))).date().isoformat()
     vn=datetime.timezone(datetime.timedelta(hours=7)); DATE_MS=int(datetime.datetime.strptime(NGAY,'%Y-%m-%d').replace(tzinfo=vn).timestamp()*1000)
+    if any(it['fields'].get('Ngày đóng gói')==DATE_MS and it['fields'].get('Kho xuất')=='Kho Mê Linh 2' for it in lsearch(ltok,T_XK,['Ngày đóng gói','Kho xuất'])):
+        return NGAY,{'status':'already'}
     # --- Âu Cơ từ Gobox (giữ nguyên) ---
     gtok=gbtoken()
     pend=gb_pending(gtok,NGAY)
     if pend>0:
-        notify_pending(NGAY,pend)
-        return NGAY,{'pending':pend,'auco':0,'ml2':0,'ck':0,'unmapped':0,'total':0}
+        return NGAY,{'status':'pending','pending':pend}
     lines=gb_all(gtok,'/open/api/reports/warehouse-export-by-sku',{'start_date':NGAY,'end_date':NGAY,'warehouse_id':WID,'limit':1000})
     wp=gb_all(gtok,'/open/api/warehouse-pickings',{'warehouse_id':WID,'type':3,'source':3,'start_done_date':NGAY,'end_done_date':NGAY,'limit':1000,'include[]':'processer'})
     def pn(r):
@@ -148,7 +149,7 @@ def sync_gobox(ltok):
     auco_n=sum(1 for q in auco.values() if q>0); ml2_n=len(xk_recs)-auco_n
     print(f'  ÂuCơ={auco_n} | ML2={ml2_n} rec | ChuyểnKho(NhậpCombo)={len(ck_recs)} rec | chưa map={len(unmapped)}')
     if unmapped: print('  chưa map:',unmapped[:10])
-    return NGAY,{'pending':0,'auco':auco_n,'ml2':ml2_n,'ck':len(ck_recs),'unmapped':len(unmapped),'total':len(xk_recs)+len(ck_recs)}
+    return NGAY,{'status':'done','auco':auco_n,'ml2':ml2_n,'ck':len(ck_recs),'unmapped':len(unmapped),'total':len(xk_recs)+len(ck_recs)}
 
 def shopee_rates(tok):
     out=lsearch(tok,T_CK,['Kho nhập','Kho xuất','G SKU','Số lượng','Ngày'])
@@ -248,12 +249,18 @@ def alert(tok,rows):
     card={'msg_type':'interactive','card':{'config':{'wide_screen_mode':True},'header':{'title':{'tag':'plain_text','content':'⚠️ Cảnh báo hết hàng — Cheng'},'template':'red'},'elements':[{'tag':'div','text':{'tag':'lark_md','content':content}}]}}
     urllib.request.urlopen(urllib.request.Request(WEBHOOK,data=json.dumps(card).encode(),headers={'Content-Type':'application/json'},method='POST'),timeout=30)
 
-def notify_pending(ngay,pend):
+def notify_pending(ngay,pend,final=False):
     dd='/'.join(reversed(ngay.split('-')))
-    body=(f"**⏳ Chưa xuất kho — {dd}**\n"
-          f"Gobox còn **{pend} đơn chưa đóng gói xong**.\n"
-          f"Hệ thống **tạm hoãn** tự động xuất kho. Đóng hết đơn rồi báo để chạy lại.")
-    card={'msg_type':'interactive','card':{'config':{'wide_screen_mode':True},'header':{'title':{'tag':'plain_text','content':'⏳ Còn đơn chưa đóng'},'template':'orange'},'elements':[{'tag':'div','text':{'tag':'lark_md','content':body}}]}}
+    if final:
+        title='🔴 Hết giờ — vẫn còn đơn'; tmpl='red'
+        body=(f"**🔴 Chưa xuất kho được — {dd}**\n"
+              f"Đến 21h Gobox vẫn còn **{pend} đơn chưa đóng gói**. Hôm nay CHƯA tự động xuất kho.\n"
+              f"Vui lòng kiểm tra/đóng đơn rồi báo để chạy tay.")
+    else:
+        title='⏳ Còn đơn chưa đóng'; tmpl='orange'
+        body=(f"**⏳ Tạm hoãn xuất kho — {dd}**\n"
+              f"Gobox còn **{pend} đơn chưa đóng gói**. Hệ thống sẽ **tự thử lại mỗi 30 phút** đến 21h.")
+    card={'msg_type':'interactive','card':{'config':{'wide_screen_mode':True},'header':{'title':{'tag':'plain_text','content':title},'template':tmpl},'elements':[{'tag':'div','text':{'tag':'lark_md','content':body}}]}}
     try: urllib.request.urlopen(urllib.request.Request(WEBHOOK,data=json.dumps(card).encode(),headers={'Content-Type':'application/json'},method='POST'),timeout=30)
     except Exception as e: print('notify_pending loi:',e)
 
@@ -272,12 +279,16 @@ def notify_done(ngay,d):
 if __name__=='__main__':
     ltok=ltoken()
     ngay,det=sync_gobox(ltok)
-    print('Đồng bộ ngày',ngay,':',det)
-    if det.get('pending'):
-        print('Còn',det['pending'],'đơn chưa đóng -> hoãn xuất kho, đã báo Lark.')
+    print('Ngày',ngay,':',det)
+    st=det.get('status')
+    if st=='already':
+        print('Đã xuất kho hôm nay rồi -> bỏ qua lần chạy này.')
+    elif st=='pending':
+        uh=datetime.datetime.utcnow().hour
+        if uh<=11: notify_pending(ngay,det['pending'],final=False)
+        elif uh>=14: notify_pending(ngay,det['pending'],final=True)
+        else: print('Còn',det['pending'],'đơn -> im lặng, thử lại sau 30p.')
     else:
         notify_done(ngay,det)
-    rows=compute(ltok)
-    build_index(rows)
-    alert(ltok,rows)
-    print('Board cập nhật + cảnh báo đã gửi. Số mã đề xuất:',len(rows))
+        rows=compute(ltok); build_index(rows); alert(ltok,rows)
+        print('Xuất kho + board + cảnh báo xong. Mã đề xuất:',len(rows))
