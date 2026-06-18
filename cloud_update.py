@@ -351,8 +351,9 @@ def send_day_reports(tok,ngay):
     dd='/'.join(reversed(ngay.split('-')))
     build_daily_report({'date':dd,'cheng':chg,'kalle':kal,'risk':risk})
     nrisk=len(risk)
-    body=f"**📊 Báo cáo bán hàng — {dd}**\nTop bán chạy Cheng (thuốc nhuộm) & Kalle, kèm **{nrisk} mã sắp hết trong 1 tuần**.\n\n👉 [Xem board chi tiết]({BOARD_URL})"
-    card={'msg_type':'interactive','card':{'config':{'wide_screen_mode':True},'header':{'title':{'tag':'plain_text','content':'📊 Báo cáo bán hàng'},'template':'blue'},'elements':[{'tag':'div','text':{'tag':'lark_md','content':body}},{'tag':'action','actions':[{'tag':'button','text':{'tag':'plain_text','content':'📊 Mở board'},'type':'primary','url':BOARD_URL}]}]}}
+    url=BOARD_URL+'?v='+str(int(datetime.datetime.now().timestamp()))
+    body=f"**📊 Báo cáo bán hàng — {dd}**\nTop bán chạy Cheng (thuốc nhuộm) & Kalle, kèm **{nrisk} mã sắp hết trong 1 tuần**.\n\n👉 [Xem board chi tiết]({url})"
+    card={'msg_type':'interactive','card':{'config':{'wide_screen_mode':True},'header':{'title':{'tag':'plain_text','content':'📊 Báo cáo bán hàng'},'template':'blue'},'elements':[{'tag':'div','text':{'tag':'lark_md','content':body}},{'tag':'action','actions':[{'tag':'button','text':{'tag':'plain_text','content':'📊 Mở board'},'type':'primary','url':url}]}]}}
     try: urllib.request.urlopen(urllib.request.Request(WEBHOOK,data=json.dumps(card).encode(),headers={'Content-Type':'application/json'},method='POST'),timeout=30)
     except Exception as e: print('send_day_reports loi:',e)
 
