@@ -1,7 +1,12 @@
-name: Daily kho update (18:30 VN)
+name: Daily kho update (18:30-21:00 VN, retry 30p)
 on:
   schedule:
     - cron: '30 11 * * *'
+    - cron: '0 12 * * *'
+    - cron: '30 12 * * *'
+    - cron: '0 13 * * *'
+    - cron: '30 13 * * *'
+    - cron: '0 14 * * *'
   workflow_dispatch:
 permissions:
   contents: write
