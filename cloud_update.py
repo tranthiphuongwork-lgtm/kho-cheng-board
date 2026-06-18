@@ -72,7 +72,7 @@ def parse_report(ngay):
         out=[]
         for c in rows(s):
             if len(c)<4: continue
-            sku=c[0].strip(); sl=c[3].replace(',','').strip()
+            sku=c[0].strip(); sl=c[3].replace(',','').replace('.','').strip()
             if not sku or not re.match(r'^[+-]?\d+$',sl): continue
             out.append((sku,c[1],int(sl)))
         return out
@@ -80,9 +80,9 @@ def parse_report(ngay):
     s2=[]
     for c in rows(seg('SECTION 2',None)):
         if len(c)<7: continue
-        sku=c[0].strip(); nums=[c[3],c[4],c[5],c[6]]
-        if not sku or not all(re.match(r'^[+-]?\d+$',x.replace(',','').strip()) for x in nums): continue
-        dau,gc,used,left=[int(x.replace(',','')) for x in nums]; s2.append((sku,c[1],dau,gc,used,left))
+        sku=c[0].strip(); nums=[x.replace(',','').replace('.','').strip() for x in [c[3],c[4],c[5],c[6]]]
+        if not sku or not all(re.match(r'^[+-]?\d+$',x) for x in nums): continue
+        dau,gc,used,left=[int(x) for x in nums]; s2.append((sku,c[1],dau,gc,used,left))
     return a,b,s2
 def gb_pending(gtok,ngay):
     # đếm phiếu tạo trong ngày chưa đóng gói (status < 200); >=200 = đã đóng gói/bàn giao, 499 = hủy
