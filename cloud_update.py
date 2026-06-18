@@ -136,9 +136,10 @@ def sync_gobox(ltok):
     exc=[it['record_id'] for it in lsearch(ltok,T_CK,['Ngày','Loại nhập kho']) if it['fields'].get('Ngày')==DATE_MS and it['fields'].get('Loại nhập kho')=='Nhập combo']
     for i in range(0,len(exc),500): lpost(ltok,f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_CK}/records/batch_delete',{'records':exc[i:i+500]})
     for i in range(0,len(ck_recs),500): lpost(ltok,f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_CK}/records/batch_create',{'records':[{'fields':r} for r in ck_recs[i:i+500]]})
-    print(f'  ÂuCơ={len(auco)} | XK(ML2+ÂuCơ)={len(xk_recs)} rec | ChuyểnKho(NhậpCombo)={len(ck_recs)} rec | chưa map={len(unmapped)}')
+    auco_n=sum(1 for q in auco.values() if q>0); ml2_n=len(xk_recs)-auco_n
+    print(f'  ÂuCơ={auco_n} | ML2={ml2_n} rec | ChuyểnKho(NhậpCombo)={len(ck_recs)} rec | chưa map={len(unmapped)}')
     if unmapped: print('  chưa map:',unmapped[:10])
-    return NGAY,len(xk_recs)+len(ck_recs)
+    return NGAY,{'auco':auco_n,'ml2':ml2_n,'ck':len(ck_recs),'unmapped':len(unmapped),'total':len(xk_recs)+len(ck_recs)}
 
 def shopee_rates(tok):
     out=lsearch(tok,T_CK,['Kho nhập','Kho xuất','G SKU','Số lượng','Ngày'])
@@ -238,10 +239,23 @@ def alert(tok,rows):
     card={'msg_type':'interactive','card':{'config':{'wide_screen_mode':True},'header':{'title':{'tag':'plain_text','content':'⚠️ Cảnh báo hết hàng — Cheng'},'template':'red'},'elements':[{'tag':'div','text':{'tag':'lark_md','content':content}}]}}
     urllib.request.urlopen(urllib.request.Request(WEBHOOK,data=json.dumps(card).encode(),headers={'Content-Type':'application/json'},method='POST'),timeout=30)
 
+def notify_done(ngay,d):
+    dd='/'.join(reversed(ngay.split('-')))
+    body=(f"**✅ Đã hoàn tất nhập/xuất kho — {dd}**\n"
+          f"• Xuất kho Âu Cơ: **{d['auco']}** mã\n"
+          f"• Xuất kho Mê Linh 2 (báo cáo): **{d['ml2']}** dòng\n"
+          f"• Nhập combo (Chuyển kho): **{d['ck']}** dòng")
+    if d['unmapped']: body+=f"\n• ⚠️ Chưa map được: **{d['unmapped']}** mã (cần kiểm tra)"
+    body+="\n\n📊 [Board](https://tranthiphuongwork-lgtm.github.io/kho-cheng-board/)"
+    card={'msg_type':'interactive','card':{'config':{'wide_screen_mode':True},'header':{'title':{'tag':'plain_text','content':'✅ Nhập/Xuất kho xong'},'template':'green'},'elements':[{'tag':'div','text':{'tag':'lark_md','content':body}}]}}
+    try: urllib.request.urlopen(urllib.request.Request(WEBHOOK,data=json.dumps(card).encode(),headers={'Content-Type':'application/json'},method='POST'),timeout=30)
+    except Exception as e: print('notify_done lỗi:',e)
+
 if __name__=='__main__':
     ltok=ltoken()
-    ngay,n=sync_gobox(ltok)
-    print('Đồng bộ Gobox->Lark ngày',ngay,':',n,'record')
+    ngay,det=sync_gobox(ltok)
+    print('Đồng bộ ngày',ngay,':',det)
+    notify_done(ngay,det)
     rows=compute(ltok)
     build_index(rows)
     alert(ltok,rows)
