@@ -117,7 +117,7 @@ def sync_gobox(ltok):
     unmapped=[]
     xk_recs=[]
     for g,q in auco.items():
-        if q>0: xk_recs.append({'Ngày đóng gói':DATE_MS,'G SKU':str(g),'Số lượng':int(q),'Kho xuất':'Kho Âu Cơ'})
+        if q>0: xk_recs.append({'Ngày đóng gói':DATE_MS,'G SKU':str(g),'Số lượng':int(q),'Kho xuất':'Kho Âu Cơ','Loại':'Xuất Bán hàng'})
     # Bước 1: Section 1A -> ML2 Xuất Bán hàng
     for sku,name,qty in s1a:
         g=sku2g.get(sku.lower()) or name2g.get(_norm(name))
