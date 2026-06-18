@@ -43,36 +43,51 @@ def gb_all(tok,path,params):
         if p>80:break
     return out
 
-def sku_gsku(tok):
-    m={}
-    for it in lsearch(tok,T_SP,['G SKU','SKU']):
-        f=it['fields']; g=gt(f.get('G SKU')); sk=gt(f.get('SKU'))
-        if g and sk: m[str(sk).strip().lower()]=str(g)
-    return m
-def giacong(ngay):
-    # đọc Section 1B (NVL -> gia công sẵn) từ báo cáo Mê Linh 2; trả {sku: qty}
+def _t2g_maps(tok):
+    sku2g={};sku2name={};name2g={}
+    for it in lsearch(tok,T_SP,['SKU','G SKU','Tên sản phẩm']):
+        f=it['fields'];sk=gt(f.get('SKU'));g=gt(f.get('G SKU'));nm=gt(f.get('Tên sản phẩm'))
+        if g:
+            g=str(g)
+            if nm: name2g[_norm(nm)]=g
+            if sk: sku2g[str(sk).strip().lower()]=g; 
+            if sk and nm: sku2name[str(sk).strip().lower()]=nm
+    return sku2g,sku2name,name2g
+def _norm(s): return re.sub(r'\s+',' ',(s or '').strip()).lower()
+def _ck_tensp(tok):
+    r=urllib.request.Request(LARK_HOST+f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_CK}/fields?page_size=200',headers={'Authorization':'Bearer '+tok})
+    for f in json.load(urllib.request.urlopen(r,timeout=40))['data']['items']:
+        if f['field_name']=='Tên SP': return {_norm(o['name']):o['name'] for o in (f.get('property') or {}).get('options',[])}
+    return {}
+def _cells(tr): return [re.sub('<[^>]+>','',c).replace('&amp;','&').strip() for c in re.findall(r'<td[^>]*>(.*?)</td>',tr,re.S)]
+def parse_report(ngay):
+    # trả (s1a, s1b, s2): s1a/s1b=[(sku,name,sl)], s2=[(sku,name,dau,gc,used,left)]
     url=f'{MELINH_RPT}/nvl-report/{ngay}?token={MELINH_TOKEN}'
-    try:
-        html=urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'c'}),timeout=40).read().decode('utf-8','ignore')
-    except Exception: return {}
-    i=html.find('SECTION 1B'); j=html.find('SECTION 2')
-    if i<0 or j<0: return {}
-    seg=html[i:j]
-    tb=re.search(r'<tbody>(.*?)</tbody>',seg,re.S)
-    if not tb: return {}
-    out={}
-    for tr in re.findall(r'<tr>(.*?)</tr>',tb.group(1),re.S):
-        if 'Chưa có gia công' in tr: continue
-        tds=re.findall(r'<td[^>]*>(.*?)</td>',tr,re.S)
-        if len(tds)<4: continue
-        sku=re.sub(r'<[^>]+>','',tds[0]).strip().lower()
-        try: qty=float(re.sub(r'[^0-9.]','',re.sub(r'<[^>]+>','',tds[3])) or 0)
-        except: qty=0
-        if sku and qty>0: out[sku]=out.get(sku,0)+qty
-    return out
-
+    try: h=urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'}),timeout=40).read().decode('utf-8','ignore')
+    except Exception: return [],[],[]
+    def seg(a,b):
+        i=h.find(a); j=h.find(b) if b else len(h); return h[i:j] if i>=0 else ''
+    def rows(s): return [_cells(tr) for tr in re.findall(r'<tr[^>]*>(.*?)</tr>',s,re.S)]
+    def kv(s):
+        out=[]
+        for c in rows(s):
+            if len(c)<4: continue
+            sku=c[0].strip(); sl=c[3].replace(',','').strip()
+            if not sku or not re.match(r'^[+-]?\d+$',sl): continue
+            out.append((sku,c[1],int(sl)))
+        return out
+    a=kv(seg('SECTION 1A','SECTION 1B')); b=kv(seg('SECTION 1B','SECTION 2'))
+    s2=[]
+    for c in rows(seg('SECTION 2',None)):
+        if len(c)<7: continue
+        sku=c[0].strip(); nums=[c[3],c[4],c[5],c[6]]
+        if not sku or not all(re.match(r'^[+-]?\d+$',x.replace(',','').strip()) for x in nums): continue
+        dau,gc,used,left=[int(x.replace(',','')) for x in nums]; s2.append((sku,c[1],dau,gc,used,left))
+    return a,b,s2
 def sync_gobox(ltok):
     NGAY=(datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7))).date()-datetime.timedelta(days=1)).isoformat()
+    vn=datetime.timezone(datetime.timedelta(hours=7)); DATE_MS=int(datetime.datetime.strptime(NGAY,'%Y-%m-%d').replace(tzinfo=vn).timestamp()*1000)
+    # --- Âu Cơ từ Gobox (giữ nguyên) ---
     gtok=gbtoken()
     lines=gb_all(gtok,'/open/api/reports/warehouse-export-by-sku',{'start_date':NGAY,'end_date':NGAY,'warehouse_id':WID,'limit':1000})
     wp=gb_all(gtok,'/open/api/warehouse-pickings',{'warehouse_id':WID,'type':3,'source':3,'start_done_date':NGAY,'end_done_date':NGAY,'limit':1000,'include[]':'processer'})
@@ -83,33 +98,47 @@ def sync_gobox(ltok):
             if isinstance(x,dict): return x.get('name')
         return None
     c2p={r['code']:pn(r) for r in wp}
-    agg=defaultdict(lambda:[0,0])  # gsku->[auco,ml2]
+    auco=defaultdict(float)
     for r in lines:
-        g=str(r.get('gsku')); q=r.get('quantity',0); kho='Kho Mê Linh 2' if c2p.get(r['code'])==MLP else 'Kho Âu Cơ'
-        if kho=='Kho Mê Linh 2': agg[g][1]+=q
-        else: agg[g][0]+=q
-    try:
-        gc=giacong(NGAY); smap=sku_gsku(ltok); added=0
-        for sku,qty in gc.items():
-            g=smap.get(sku)
-            if g: agg[g][1]+=qty; added+=qty
-        if added: print('  + gia công Mê Linh 2:',int(added),'đơn vị')
-    except Exception as e:
-        print('  gia công skip:',e)
-    if not agg: return NGAY,0
-    vn=datetime.timezone(datetime.timedelta(hours=7))
-    DATE_MS=int(datetime.datetime.strptime(NGAY,'%Y-%m-%d').replace(tzinfo=vn).timestamp()*1000)
-    # dedup delete existing for this date
+        if c2p.get(r['code'])!=MLP: auco[str(r['gsku'])]+=r.get('quantity',0)
+    # --- Mê Linh 2 từ báo cáo (Bước 1-4) ---
+    s1a,s1b,s2=parse_report(NGAY)
+    sku2g,sku2name,name2g=_t2g_maps(ltok); tensp=_ck_tensp(ltok)
+    unmapped=[]
+    xk_recs=[]
+    for g,q in auco.items():
+        if q>0: xk_recs.append({'Ngày đóng gói':DATE_MS,'G SKU':str(g),'Số lượng':int(q),'Kho xuất':'Kho Âu Cơ'})
+    # Bước 1: Section 1A -> ML2 Xuất Bán hàng
+    for sku,name,qty in s1a:
+        g=sku2g.get(sku.lower()) or name2g.get(_norm(name))
+        if not g: unmapped.append(('1A',sku,name,qty)); continue
+        if qty>0: xk_recs.append({'Ngày đóng gói':DATE_MS,'G SKU':str(g),'Số lượng':int(qty),'Kho xuất':'Kho Mê Linh 2','Loại':'Xuất Bán hàng'})
+    # Bước 2: Section 1B -> ML2 Xuất Gia công
+    for sku,name,qty in s1b:
+        g=sku2g.get(sku.lower()) or name2g.get(_norm(name))
+        if not g: unmapped.append(('1B',sku,name,qty)); continue
+        if qty>0: xk_recs.append({'Ngày đóng gói':DATE_MS,'G SKU':str(g),'Số lượng':int(qty),'Kho xuất':'Kho Mê Linh 2','Loại':'Xuất Gia công'})
+    # Bước 4: Section 2 -Đã dùng -> ML2 Xuất Bán hàng, G SKU=SKU combo
+    for sku,name,dau,gc,used,left in s2:
+        if used<0: xk_recs.append({'Ngày đóng gói':DATE_MS,'G SKU':sku,'Số lượng':int(abs(used)),'Kho xuất':'Kho Mê Linh 2','Loại':'Xuất Bán hàng'})
+    # Bước 3: Section 2 +Gia công -> Chuyển kho Nhập combo
+    ck_recs=[]
+    for sku,name,dau,gc,used,left in s2:
+        if gc<=0: continue
+        opt=tensp.get(_norm(name)) or tensp.get(_norm(sku2name.get(sku.lower())))
+        if not opt: unmapped.append(('S2+GC',sku,name,gc)); continue
+        ck_recs.append({'Ngày':DATE_MS,'Loại nhập kho':'Nhập combo','Tên SP':opt,'Số lượng':int(gc),'Kho nhập':'Mê Linh 2'})
+    # --- Dedup + ghi Xuất kho (xoá hết record ngày này) ---
     ex=[it['record_id'] for it in lsearch(ltok,T_XK,['Ngày đóng gói']) if it['fields'].get('Ngày đóng gói')==DATE_MS]
-    for i in range(0,len(ex),500):
-        lpost(ltok,f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_XK}/records/batch_delete',{'records':ex[i:i+500]})
-    recs=[]
-    for g,(a,m) in agg.items():
-        if a>0: recs.append({'fields':{'Ngày đóng gói':DATE_MS,'G SKU':str(g),'Số lượng':int(a),'Kho xuất':'Kho Âu Cơ'}})
-        if m>0: recs.append({'fields':{'Ngày đóng gói':DATE_MS,'G SKU':str(g),'Số lượng':int(m),'Kho xuất':'Kho Mê Linh 2'}})
-    for i in range(0,len(recs),500):
-        lpost(ltok,f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_XK}/records/batch_create',{'records':recs[i:i+500]})
-    return NGAY,len(recs)
+    for i in range(0,len(ex),500): lpost(ltok,f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_XK}/records/batch_delete',{'records':ex[i:i+500]})
+    for i in range(0,len(xk_recs),500): lpost(ltok,f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_XK}/records/batch_create',{'records':[{'fields':r} for r in xk_recs[i:i+500]]})
+    # --- Dedup + ghi Chuyển kho (chỉ Nhập combo ngày này) ---
+    exc=[it['record_id'] for it in lsearch(ltok,T_CK,['Ngày','Loại nhập kho']) if it['fields'].get('Ngày')==DATE_MS and it['fields'].get('Loại nhập kho')=='Nhập combo']
+    for i in range(0,len(exc),500): lpost(ltok,f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_CK}/records/batch_delete',{'records':exc[i:i+500]})
+    for i in range(0,len(ck_recs),500): lpost(ltok,f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_CK}/records/batch_create',{'records':[{'fields':r} for r in ck_recs[i:i+500]]})
+    print(f'  ÂuCơ={len(auco)} | XK(ML2+ÂuCơ)={len(xk_recs)} rec | ChuyểnKho(NhậpCombo)={len(ck_recs)} rec | chưa map={len(unmapped)}')
+    if unmapped: print('  chưa map:',unmapped[:10])
+    return NGAY,len(xk_recs)+len(ck_recs)
 
 def shopee_rates(tok):
     out=lsearch(tok,T_CK,['Kho nhập','Kho xuất','G SKU','Số lượng','Ngày'])
