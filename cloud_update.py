@@ -325,10 +325,10 @@ if(!D.risk.length){rk.innerHTML='<div class=empty>Không có mã nào dưới 3 
 def send_day_reports(tok,ngay):
     DATE_MS=int(datetime.datetime.strptime(ngay,'%Y-%m-%d').replace(tzinfo=datetime.timezone(datetime.timedelta(hours=7))).timestamp()*1000)
     inv={}
-    for it in lsearch(tok,T_SP,['G SKU','Tên sản phẩm','Hãng','Phân loại','Tồn kho Âu Cơ','Kho Mê Linh 1','Kho Mê Linh 2']):
+    for it in lsearch(tok,T_SP,['G SKU','Tên sản phẩm','Hãng','Phân loại','Tồn kho Âu Cơ','Kho Mê Linh 1','Kho Mê Linh 2','Thông báo hết hàng']):
         f=it['fields'];g=gt(f.get('G SKU'))
         if not g: continue
-        inv[str(g)]={'name':gt(f.get('Tên sản phẩm')) or g,'hang':(gt(f.get('Hãng')) or '—').strip(),'pl':(gt(f.get('Phân loại')) or '').strip(),'ton':fv(f.get('Tồn kho Âu Cơ'))+fv(f.get('Kho Mê Linh 1'))+fv(f.get('Kho Mê Linh 2'))}
+        inv[str(g)]={'name':gt(f.get('Tên sản phẩm')) or g,'hang':(gt(f.get('Hãng')) or '—').strip(),'pl':(gt(f.get('Phân loại')) or '').strip(),'ton':fv(f.get('Tồn kho Âu Cơ'))+fv(f.get('Kho Mê Linh 1'))+fv(f.get('Kho Mê Linh 2')),'tb':bool(f.get('Thông báo hết hàng'))}
     from collections import defaultdict as _dd
     day=_dd(float);s7=_dd(float);s30=_dd(float)
     for it in lsearch(tok,T_XK,['G SKU','Số lượng','Ngày đóng gói']):
@@ -344,7 +344,7 @@ def send_day_reports(tok,ngay):
     kal=[{'name':inv[g]['name'],'qty':int(day[g]),'ton':int(inv[g]['ton'])} for g in sorted(day,key=lambda x:-day[x]) if inv.get(g,{}).get('hang')=='Kalle'][:10]
     risk=[]
     for g,v in inv.items():
-        if g in TRIO or v['hang'] not in ('Cheng','Kalle') or v['pl']=='NVL': continue
+        if g in TRIO or v.get('tb') or v['hang'] not in ('Cheng','Kalle') or v['pl']=='NVL': continue
         r=rate(g)
         if r>0 and 0<v['ton']<r*3: risk.append({'name':v['name'],'rate':round(r,1),'ton':int(v['ton']),'days':round(v['ton']/r,1)})
     risk=sorted(risk,key=lambda x:-x['rate'])[:10]
