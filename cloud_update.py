@@ -299,7 +299,7 @@ body{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:#0f
 .empty{color:#7d8db0;font-size:13px;padding:8px}
 .foot{text-align:center;color:#5b6b8c;font-size:11px;margin-top:16px}
 </style></head><body>
-<div class="head"><h1>📊 Báo cáo bán hàng — Kho</h1><div class="sub">Ngày __DATE__ · Top bán chạy & cảnh báo sắp hết hàng</div></div>
+<div class="head"><h1>📊 Báo cáo bán hàng — Kho</h1><div class="sub">Ngày __DATE__ · Top bán chạy & cảnh báo sắp hết · tốc độ bán TB 2 tuần</div></div>
 <div class="grid">
  <div class="card"><h2>🏆 Top bán chạy <span class="tag c">CHENG · thuốc nhuộm</span></h2><div id="cheng"></div></div>
  <div class="card"><h2>🏆 Top bán chạy <span class="tag k">KALLE</span></h2><div id="kalle"></div></div>
@@ -313,7 +313,7 @@ function sellers(id,arr,cls){var el=document.getElementById(id);if(!arr.length){
  var mx=Math.max.apply(null,arr.map(function(x){return x.qty}))||1;
  el.innerHTML=arr.map(function(x,i){var w=Math.max(4,Math.round(x.qty/mx*100));
   return '<div class=row><div class=r1><div class=nm><span class=rk>'+(i+1)+'</span>'+x.name+'</div><div class=qty>'+fmt(x.qty)+'</div></div>'+
-  '<div class=bar><i class="'+cls+'" style="width:'+w+'%"></i></div><div class=tn>tồn '+fmt(x.ton)+'</div></div>'}).join('')}
+  '<div class=bar><i class="'+cls+'" style="width:'+w+'%"></i></div><div class=tn>tồn '+fmt(x.ton)+(x.days!=null?' · đủ bán ~<b style="color:'+(x.days<7?'#f87171':(x.days<14?'#fbbf24':'#9fb0d0'))+'">'+x.days+' ngày</b>':' · đủ bán lâu')+'</div></div>'}).join('')}
 sellers('cheng',D.cheng,'bc');sellers('kalle',D.kalle,'bk');
 var rk=document.getElementById('risk');
 if(!D.risk.length){rk.innerHTML='<div class=empty>Không có mã nào dưới 3 ngày 🎉</div>'}else{
@@ -330,18 +330,18 @@ def send_day_reports(tok,ngay):
         if not g: continue
         inv[str(g)]={'name':gt(f.get('Tên sản phẩm')) or g,'hang':(gt(f.get('Hãng')) or '—').strip(),'pl':(gt(f.get('Phân loại')) or '').strip(),'ton':fv(f.get('Tồn kho Âu Cơ'))+fv(f.get('Kho Mê Linh 1'))+fv(f.get('Kho Mê Linh 2')),'tb':bool(f.get('Thông báo hết hàng'))}
     from collections import defaultdict as _dd
-    day=_dd(float);s7=_dd(float);s30=_dd(float)
+    day=_dd(float);s14=_dd(float)
     for it in lsearch(tok,T_XK,['G SKU','Số lượng','Ngày đóng gói']):
         f=it['fields'];g=gt(f.get('G SKU'));q=f.get('Số lượng') or 0;dt=f.get('Ngày đóng gói')
         if not g or not isinstance(dt,(int,float)): continue
         g=str(g)
         if dt==DATE_MS: day[g]+=q
         dd=(DATE_MS-dt)/86400000
-        if 0<=dd<7: s7[g]+=q
-        if 0<=dd<30: s30[g]+=q
-    rate=lambda g:max(s7.get(g,0)/7,s30.get(g,0)/30)
-    chg=[{'name':inv[g]['name'],'qty':int(day[g]),'ton':int(inv[g]['ton'])} for g in sorted(day,key=lambda x:-day[x]) if inv.get(g,{}).get('hang')=='Cheng' and inv.get(g,{}).get('pl') in DYE_PL][:10]
-    kal=[{'name':inv[g]['name'],'qty':int(day[g]),'ton':int(inv[g]['ton'])} for g in sorted(day,key=lambda x:-day[x]) if inv.get(g,{}).get('hang')=='Kalle'][:10]
+        if 0<=dd<14: s14[g]+=q
+    rate=lambda g:s14.get(g,0)/14
+    dleft=lambda g:(round(inv[g]['ton']/rate(g),1) if rate(g)>0 else None)
+    chg=[{'name':inv[g]['name'],'qty':int(day[g]),'ton':int(inv[g]['ton']),'rate':round(rate(g),1),'days':dleft(g)} for g in sorted(day,key=lambda x:-day[x]) if inv.get(g,{}).get('hang')=='Cheng' and inv.get(g,{}).get('pl') in DYE_PL][:10]
+    kal=[{'name':inv[g]['name'],'qty':int(day[g]),'ton':int(inv[g]['ton']),'rate':round(rate(g),1),'days':dleft(g)} for g in sorted(day,key=lambda x:-day[x]) if inv.get(g,{}).get('hang')=='Kalle'][:10]
     risk=[]
     for g,v in inv.items():
         if g in TRIO or v.get('tb') or v['hang'] not in ('Cheng','Kalle') or v['pl']=='NVL': continue
