@@ -5,7 +5,7 @@ from collections import defaultdict
 LARK_HOST='https://open.larksuite.com'; GB='https://api.gobox.asia'
 APP_ID=os.environ['LARK_APP_ID']; APP_SECRET=os.environ['LARK_APP_SECRET']; BASE=os.environ['LARK_APP_TOKEN']
 GCID=os.environ['GOBOX_CLIENT_ID']; GSEC=os.environ['GOBOX_CLIENT_SECRET']; WEBHOOK=os.environ['LARK_WEBHOOK']
-T_SP='tbl7PSQh3Lq5Tlxy'; T_XK='tblIHtLsM4QTMMQJ'; T_CK='tblylArl4EL4AvrX'
+T_SP='tbl7PSQh3Lq5Tlxy'; T_XK='tblIHtLsM4QTMMQJ'; T_CK='tblylArl4EL4AvrX'; T_HOAN='tblhaZvKxCktFtgW'
 WID='32'; COVER=45; MELINH_RPT='https://melinh-lark-relay.hungnv21295.workers.dev'; MELINH_TOKEN='melinh-share-2026'; TRIO=['1082704','1082694','1082699']; MLP='Mê Linh In Hàng Loạt'
 
 def ltoken():
@@ -369,6 +369,40 @@ def notify_done(ngay,d):
     try: urllib.request.urlopen(urllib.request.Request(WEBHOOK,data=json.dumps(card).encode(),headers={'Content-Type':'application/json'},method='POST'),timeout=30)
     except Exception as e: print('notify_done lỗi:',e)
 
+def sync_hanghoan(ltok,ngay):
+    DATE_MS=int(datetime.datetime.strptime(ngay,'%Y-%m-%d').replace(tzinfo=datetime.timezone(datetime.timedelta(hours=7))).timestamp()*1000)
+    gtok=gbtoken()
+    from collections import defaultdict as _dd
+    qty=_dd(float);pg=1
+    while pg<=80:
+        url=GB+'/open/api/orders?'+urllib.parse.urlencode({'warehouse_id':WID,'is_return':1,'limit':200,'page':pg,'include[]':'items'})
+        d=json.load(urllib.request.urlopen(urllib.request.Request(url,headers={'Authorization':'Bearer '+gtok,'Accept':'application/json'}),timeout=60))
+        data=d.get('data',[])
+        if not data: break
+        recent=False
+        for r in data:
+            dmy=(r.get('update_time') or '')[:10]
+            try: dd,mm,yy=dmy.split('-'); iso=f'{yy}-{mm}-{dd}'
+            except: continue
+            if iso>=ngay: recent=True
+            if r.get('return_status_warehouse')==1 and iso==ngay:
+                for it in (r.get('items') or {}).get('data',[]):
+                    sk=(it.get('sku_code') or '').strip().lower(); q=it.get('quantity') or 0
+                    if sk: qty[sk]+=q
+        if not recent and pg>4: break
+        if not d.get('meta',{}).get('cursor',{}).get('next'): break
+        pg+=1
+    sku2g,_,_=_t2g_maps(ltok); recs=[];un=0
+    for sk,q in qty.items():
+        g=sku2g.get(sk)
+        if not g: un+=1; continue
+        if q>0: recs.append({'Ngày đóng gói':DATE_MS,'G SKU':str(g),'Số lượng':int(q),'Ghi chú':'Hàng hoàn (Gobox)'})
+    ex=[it['record_id'] for it in lsearch(ltok,T_HOAN,['Ngày đóng gói']) if it['fields'].get('Ngày đóng gói')==DATE_MS]
+    for i in range(0,len(ex),500): lpost(ltok,f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_HOAN}/records/batch_delete',{'records':ex[i:i+500]})
+    for i in range(0,len(recs),500): lpost(ltok,f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_HOAN}/records/batch_create',{'records':[{'fields':x} for x in recs[i:i+500]]})
+    print('  Hàng hoàn %s: %d SKU / %d sp (xoá cũ %d, chưa map %d)'%(ngay,len(recs),int(sum(x['Số lượng'] for x in recs)),len(ex),un))
+    return len(recs)
+
 if __name__=='__main__':
     ltok=ltoken()
     ngay,det=sync_gobox(ltok)
@@ -385,5 +419,7 @@ if __name__=='__main__':
         notify_done(ngay,det)
         try: send_day_reports(ltok,ngay)
         except Exception as e: print('reports loi:',e)
+        try: sync_hanghoan(ltok,ngay)
+        except Exception as e: print('hàng hoàn loi:',e)
         rows=compute(ltok); build_index(rows); alert(ltok,rows)
         print('Xuất kho + board + cảnh báo xong. Mã đề xuất:',len(rows))
