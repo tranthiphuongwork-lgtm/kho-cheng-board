@@ -122,6 +122,15 @@ def sync_gobox(ltok):
     xk_recs=[]
     for g,q in auco.items():
         if q>0: xk_recs.append({'Ngày đóng gói':DATE_MS,'G SKU':str(g),'Số lượng':int(q),'Kho xuất':'Kho Âu Cơ','Loại':'Xuất Bán hàng'})
+    # + Kho Mê Linh (Gobox kho 65) -> cộng vào Kho Mê Linh 2
+    try:
+        l65=gb_all(gtok,'/open/api/reports/warehouse-export-by-sku',{'start_date':NGAY,'end_date':NGAY,'warehouse_id':65,'limit':1000})
+        a65=defaultdict(float)
+        for r in l65: a65[str(r.get('gsku'))]+=r.get('quantity',0)
+        for g,q in a65.items():
+            if q>0: xk_recs.append({'Ngày đóng gói':DATE_MS,'G SKU':str(g),'Số lượng':int(q),'Kho xuất':'Kho Mê Linh 2','Loại':'Xuất Bán hàng','Ghi chú':'Kho Mê Linh (GB65)'})
+        if a65: print('  + Kho Mê Linh (GB65):',len(a65),'GSKU /',int(sum(a65.values())),'đv')
+    except Exception as e: print('  kho65 skip:',e)
     # Bước 1: Section 1A -> ML2 Xuất Bán hàng
     for sku,name,qty in s1a:
         g=sku2g.get(sku.lower()) or name2g.get(_norm(name))
