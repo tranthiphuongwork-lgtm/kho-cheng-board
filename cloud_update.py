@@ -85,18 +85,22 @@ def parse_report(ngay):
         dau,gc,used,left=[int(x) for x in nums]; s2.append((sku,c[1],dau,gc,used,left))
     return a,b,s2
 def gb_pending(gtok,ngay):
-    # đếm phiếu tạo trong ngày chưa đóng gói (status < 200); >=200 = đã đóng gói/bàn giao, 499 = hủy
+    # phiếu tạo trong ngày: pend=chưa đóng (status<200), total=đơn không hủy (status!=499)
     wp=gb_all(gtok,'/open/api/warehouse-pickings',{'warehouse_id':WID,'type':3,'source':3,'start_created_date':ngay,'end_created_date':ngay,'limit':1000})
-    return sum(1 for r in wp if isinstance(r.get('status'),int) and r['status']<200)
+    pend=sum(1 for r in wp if isinstance(r.get('status'),int) and r['status']<200)
+    total=sum(1 for r in wp if r.get('status')!=499)
+    return pend,total
 
 def sync_gobox(ltok):
     NGAY=datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7))).date().isoformat()
     vn=datetime.timezone(datetime.timedelta(hours=7)); DATE_MS=int(datetime.datetime.strptime(NGAY,'%Y-%m-%d').replace(tzinfo=vn).timestamp()*1000)
-    if any(it['fields'].get('Ngày đóng gói')==DATE_MS and it['fields'].get('Kho xuất')=='Kho Mê Linh 2' for it in lsearch(ltok,T_XK,['Ngày đóng gói','Kho xuất'])):
+    if any(it['fields'].get('Ngày đóng gói')==DATE_MS for it in lsearch(ltok,T_XK,['Ngày đóng gói'])):
         return NGAY,{'status':'already'}
     # --- Âu Cơ từ Gobox (giữ nguyên) ---
     gtok=gbtoken()
-    pend=gb_pending(gtok,NGAY)
+    pend,total=gb_pending(gtok,NGAY)
+    if total==0:
+        return NGAY,{'status':'notready'}
     if pend>0:
         return NGAY,{'status':'pending','pending':pend}
     lines=gb_all(gtok,'/open/api/reports/warehouse-export-by-sku',{'start_date':NGAY,'end_date':NGAY,'warehouse_id':WID,'limit':1000})
@@ -249,113 +253,14 @@ def alert(tok,rows):
     card={'msg_type':'interactive','card':{'config':{'wide_screen_mode':True},'header':{'title':{'tag':'plain_text','content':'⚠️ Cảnh báo hết hàng — Cheng'},'template':'red'},'elements':[{'tag':'div','text':{'tag':'lark_md','content':content}}]}}
     urllib.request.urlopen(urllib.request.Request(WEBHOOK,data=json.dumps(card).encode(),headers={'Content-Type':'application/json'},method='POST'),timeout=30)
 
-def notify_pending(ngay,pend,final=False):
+def notify_pending(ngay,pend):
     dd='/'.join(reversed(ngay.split('-')))
-    if final:
-        title='🔴 Hết giờ — vẫn còn đơn'; tmpl='red'
-        body=(f"**🔴 Chưa xuất kho được — {dd}**\n"
-              f"Đến 21h Gobox vẫn còn **{pend} đơn chưa đóng gói**. Hôm nay CHƯA tự động xuất kho.\n"
-              f"Vui lòng kiểm tra/đóng đơn rồi báo để chạy tay.")
-    else:
-        title='⏳ Còn đơn chưa đóng'; tmpl='orange'
-        body=(f"**⏳ Tạm hoãn xuất kho — {dd}**\n"
-              f"Gobox còn **{pend} đơn chưa đóng gói**. Hệ thống sẽ **tự thử lại mỗi 30 phút** đến 21h.")
-    card={'msg_type':'interactive','card':{'config':{'wide_screen_mode':True},'header':{'title':{'tag':'plain_text','content':title},'template':tmpl},'elements':[{'tag':'div','text':{'tag':'lark_md','content':body}}]}}
+    body=(f"**⏳ Chưa xuất kho — {dd}**\n"
+          f"Gobox còn **{pend} đơn chưa đóng gói xong**. Cần đóng nốt đơn.\n"
+          f"Hệ thống sẽ tự kiểm tra lại sau **30 phút**; đóng hết đơn sẽ tự xuất kho.")
+    card={'msg_type':'interactive','card':{'config':{'wide_screen_mode':True},'header':{'title':{'tag':'plain_text','content':'⏳ Chưa xuất kho — còn đơn'},'template':'orange'},'elements':[{'tag':'div','text':{'tag':'lark_md','content':body}}]}}
     try: urllib.request.urlopen(urllib.request.Request(WEBHOOK,data=json.dumps(card).encode(),headers={'Content-Type':'application/json'},method='POST'),timeout=30)
     except Exception as e: print('notify_pending loi:',e)
-
-DYE_PL={'Dưỡng ít','Dưỡng vừa','Dưỡng nhiều','3 gói bọt','5 gói bọt','10 gói','Màu lẻ'}
-BOARD_URL='https://tranthiphuongwork-lgtm.github.io/kho-cheng-board/daily_report.html'
-def build_daily_report(data):
-    tpl=r'''<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Báo cáo bán hàng __DATE__</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:#0f1729;color:#e6edf6;padding:18px;max-width:1100px;margin:0 auto}
-.head{background:linear-gradient(135deg,#2563eb,#7c3aed);border-radius:16px;padding:20px 24px;margin-bottom:18px}
-.head h1{font-size:22px;font-weight:800}.head .sub{opacity:.85;font-size:13px;margin-top:4px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media(max-width:760px){.grid{grid-template-columns:1fr}}
-.card{background:#16203a;border:1px solid #243352;border-radius:14px;padding:16px}
-.card h2{font-size:15px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
-.tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px}
-.tag.c{background:#1e3a8a;color:#bfdbfe}.tag.k{background:#5b21b6;color:#ddd6fe}
-.row{margin-bottom:10px}
-.row .r1{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px}
-.row .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.row .rk{display:inline-block;width:20px;color:#7d8db0;font-weight:700}
-.row .qty{font-weight:800;font-size:14px}
-.row .tn{color:#7d8db0;font-size:11px;white-space:nowrap}
-.bar{height:6px;border-radius:6px;margin-top:4px;background:#243352;overflow:hidden}
-.bar>i{display:block;height:100%;border-radius:6px}
-.bc{background:linear-gradient(90deg,#3b82f6,#60a5fa)}.bk{background:linear-gradient(90deg,#8b5cf6,#a78bfa)}
-.risk h2{color:#fbbf24}
-.ri{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;background:#1b1430;border-left:4px solid #f59e0b;margin-bottom:8px}
-.ri.cr{border-color:#ef4444;background:#2a1320}.ri.wn{border-color:#f59e0b}.ri.ye{border-color:#eab308}
-.ri .nm{flex:1;font-size:13px;font-weight:600}
-.ri .meta{font-size:11px;color:#9fb0d0;text-align:right;white-space:nowrap}
-.ri .dd{font-weight:800;font-size:15px;text-align:center}
-.dd.cr{color:#f87171}.dd.wn{color:#fbbf24}.dd.ye{color:#fde047}
-.empty{color:#7d8db0;font-size:13px;padding:8px}
-.foot{text-align:center;color:#5b6b8c;font-size:11px;margin-top:16px}
-</style></head><body>
-<div class="head"><h1>📊 Báo cáo bán hàng — Kho</h1><div class="sub">Ngày __DATE__ · Top bán chạy & cảnh báo sắp hết · tốc độ bán TB 2 tuần</div></div>
-<div class="grid">
- <div class="card"><h2>🏆 Top bán chạy <span class="tag c">CHENG · thuốc nhuộm</span></h2><div id="cheng"></div></div>
- <div class="card"><h2>🏆 Top bán chạy <span class="tag k">KALLE</span></h2><div id="kalle"></div></div>
-</div>
-<div class="card risk" style="margin-top:16px"><h2>⚠️ Sắp hết trong 1 tuần tới</h2><div class="empty" style="margin-bottom:6px">Tốc độ bán cao, tồn hiện không đủ bán 1 tuần — cần nhập thêm.</div><div id="risk"></div></div>
-<div class="foot">Tự động cập nhật sau mỗi lần xuất kho · Kho Cheng/Kalle</div>
-<script>
-var D=__DATA__;
-function fmt(n){return n.toLocaleString('vi-VN')}
-function sellers(id,arr,cls){var el=document.getElementById(id);if(!arr.length){el.innerHTML='<div class=empty>Không có dữ liệu</div>';return}
- var mx=Math.max.apply(null,arr.map(function(x){return x.qty}))||1;
- el.innerHTML=arr.map(function(x,i){var w=Math.max(4,Math.round(x.qty/mx*100));
-  return '<div class=row><div class=r1><div class=nm><span class=rk>'+(i+1)+'</span>'+x.name+'</div><div class=qty>'+fmt(x.qty)+'</div></div>'+
-  '<div class=bar><i class="'+cls+'" style="width:'+w+'%"></i></div><div class=tn>tồn '+fmt(x.ton)+(x.days==null?' · đủ bán lâu':(x.days<0?' · <b style="color:#f87171">tồn âm</b>':' · đủ bán ~<b style="color:'+(x.days<7?'#f87171':(x.days<14?'#fbbf24':'#9fb0d0'))+'">'+x.days+' ngày</b>'))+'</div></div>'}).join('')}
-sellers('cheng',D.cheng,'bc');sellers('kalle',D.kalle,'bk');
-var rk=document.getElementById('risk');
-if(!D.risk.length){rk.innerHTML='<div class=empty>Không có mã nào dưới 3 ngày 🎉</div>'}else{
- rk.innerHTML=D.risk.map(function(x){var c=x.days<2?'cr':(x.days<4?'wn':'ye');
-  return '<div class="ri '+c+'"><div class=nm>'+x.name+'</div><div class=meta>bán ~<b>'+fmt(x.rate)+'</b>/ngày · tồn <b>'+fmt(x.ton)+'</b></div><div class="dd '+c+'">'+x.days+'<div style="font-size:9px;font-weight:600;color:#9fb0d0">ngày</div></div></div>'}).join('')}
-</script></body></html>'''
-    html=tpl.replace('__DATE__',data['date']).replace('__DATA__',json.dumps(data,ensure_ascii=False))
-    open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'daily_report.html'),'w',encoding='utf-8').write(html)
-def send_day_reports(tok,ngay):
-    DATE_MS=int(datetime.datetime.strptime(ngay,'%Y-%m-%d').replace(tzinfo=datetime.timezone(datetime.timedelta(hours=7))).timestamp()*1000)
-    inv={}
-    for it in lsearch(tok,T_SP,['G SKU','Tên sản phẩm','Hãng','Phân loại','Tồn kho Âu Cơ','Kho Mê Linh 1','Kho Mê Linh 2','Thông báo hết hàng']):
-        f=it['fields'];g=gt(f.get('G SKU'))
-        if not g: continue
-        inv[str(g)]={'name':gt(f.get('Tên sản phẩm')) or g,'hang':(gt(f.get('Hãng')) or '—').strip(),'pl':(gt(f.get('Phân loại')) or '').strip(),'ton':fv(f.get('Tồn kho Âu Cơ'))+fv(f.get('Kho Mê Linh 1'))+fv(f.get('Kho Mê Linh 2')),'tb':bool(f.get('Thông báo hết hàng'))}
-    from collections import defaultdict as _dd
-    day=_dd(float);s14=_dd(float)
-    for it in lsearch(tok,T_XK,['G SKU','Số lượng','Ngày đóng gói']):
-        f=it['fields'];g=gt(f.get('G SKU'));q=f.get('Số lượng') or 0;dt=f.get('Ngày đóng gói')
-        if not g or not isinstance(dt,(int,float)): continue
-        g=str(g)
-        if dt==DATE_MS: day[g]+=q
-        dd=(DATE_MS-dt)/86400000
-        if 0<=dd<14: s14[g]+=q
-    rate=lambda g:s14.get(g,0)/14
-    dleft=lambda g:(round(inv[g]['ton']/rate(g),1) if rate(g)>0 else None)
-    chg=[{'name':inv[g]['name'],'qty':int(day[g]),'ton':int(inv[g]['ton']),'rate':round(rate(g),1),'days':dleft(g)} for g in sorted(day,key=lambda x:-day[x]) if inv.get(g,{}).get('hang')=='Cheng' and inv.get(g,{}).get('pl') in DYE_PL][:10]
-    kal=[{'name':inv[g]['name'],'qty':int(day[g]),'ton':int(inv[g]['ton']),'rate':round(rate(g),1),'days':dleft(g)} for g in sorted(day,key=lambda x:-day[x]) if inv.get(g,{}).get('hang')=='Kalle'][:10]
-    risk=[]
-    for g,v in inv.items():
-        if g in TRIO or v.get('tb') or v['hang'] not in ('Cheng','Kalle') or v['pl']=='NVL': continue
-        r=rate(g)
-        if r>0 and 0<v['ton']<r*7: risk.append({'name':v['name'],'rate':round(r,1),'ton':int(v['ton']),'days':round(v['ton']/r,1)})
-    risk=sorted(risk,key=lambda x:-x['rate'])[:10]
-    dd='/'.join(reversed(ngay.split('-')))
-    build_daily_report({'date':dd,'cheng':chg,'kalle':kal,'risk':risk})
-    nrisk=len(risk)
-    url=BOARD_URL+'?v='+str(int(datetime.datetime.now().timestamp()))
-    body=f"**📊 Báo cáo bán hàng — {dd}**\nTop bán chạy Cheng (thuốc nhuộm) & Kalle, kèm **{nrisk} mã sắp hết trong 1 tuần**.\n\n👉 [Xem board chi tiết]({url})"
-    card={'msg_type':'interactive','card':{'config':{'wide_screen_mode':True},'header':{'title':{'tag':'plain_text','content':'📊 Báo cáo bán hàng'},'template':'blue'},'elements':[{'tag':'div','text':{'tag':'lark_md','content':body}},{'tag':'action','actions':[{'tag':'button','text':{'tag':'plain_text','content':'📊 Mở board'},'type':'primary','url':url}]}]}}
-    try: urllib.request.urlopen(urllib.request.Request(WEBHOOK,data=json.dumps(card).encode(),headers={'Content-Type':'application/json'},method='POST'),timeout=30)
-    except Exception as e: print('send_day_reports loi:',e)
 
 def notify_done(ngay,d):
     dd='/'.join(reversed(ngay.split('-')))
@@ -404,17 +309,20 @@ def sync_hanghoan(ltok,ngay):
     return len(recs)
 
 if __name__=='__main__':
+    vn=datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7)))
+    mins=vn.hour*60+vn.minute
+    if not (18*60+25 <= mins <= 23*60):
+        print('Ngoài khung 18h30–23h VN (%02d:%02d) -> bỏ qua.'%(vn.hour,vn.minute))
+        raise SystemExit
     ltok=ltoken()
     ngay,det=sync_gobox(ltok)
-    print('Ngày',ngay,':',det)
-    st=det.get('status')
+    st=det.get('status'); print('Ngày',ngay,st,det)
     if st=='already':
-        print('Đã xuất kho hôm nay rồi -> bỏ qua lần chạy này.')
+        print('Đã xuất kho hôm nay rồi -> bỏ qua.')
+    elif st=='notready':
+        print('Chưa có đơn nào trong ngày -> bỏ qua (chưa tới giờ đóng).')
     elif st=='pending':
-        uh=datetime.datetime.utcnow().hour
-        if uh<=11: notify_pending(ngay,det['pending'],final=False)
-        elif uh>=14: notify_pending(ngay,det['pending'],final=True)
-        else: print('Còn',det['pending'],'đơn -> im lặng, thử lại sau 30p.')
+        notify_pending(ngay,det['pending'])
     else:
         notify_done(ngay,det)
         try: send_day_reports(ltok,ngay)
