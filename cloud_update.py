@@ -112,9 +112,12 @@ def sync_gobox(ltok):
             if isinstance(x,dict): return x.get('name')
         return None
     c2p={r['code']:pn(r) for r in wp}
-    auco=defaultdict(float)
+    c2s={r['code']:r.get('status') for r in wp}
+    auco=defaultdict(float); ml2gb=defaultdict(float)
     for r in lines:
-        if c2p.get(r['code'])!=MLP: auco[str(r['gsku'])]+=r.get('quantity',0)
+        if c2s.get(r['code'])==499: continue  # loại đơn hủy
+        if c2p.get(r['code'])==MLP: ml2gb[str(r['gsku'])]+=r.get('quantity',0)
+        else: auco[str(r['gsku'])]+=r.get('quantity',0)
     # --- Mê Linh 2 từ báo cáo (Bước 1-4) ---
     s1a,s1b,s2=parse_report(NGAY)
     sku2g,sku2name,name2g=_t2g_maps(ltok); tensp=_ck_tensp(ltok)
@@ -122,6 +125,9 @@ def sync_gobox(ltok):
     xk_recs=[]
     for g,q in auco.items():
         if q>0: xk_recs.append({'Ngày đóng gói':DATE_MS,'G SKU':str(g),'Số lượng':int(q),'Kho xuất':'Kho Âu Cơ','Loại':'Xuất Bán hàng'})
+    # Mê Linh 2 Xuất Bán hàng = Gobox tài khoản "Mê Linh In Hàng Loạt" (đã loại đơn hủy)
+    for g,q in ml2gb.items():
+        if q>0: xk_recs.append({'Ngày đóng gói':DATE_MS,'G SKU':str(g),'Số lượng':int(q),'Kho xuất':'Kho Mê Linh 2','Loại':'Xuất Bán hàng'})
     # + Kho Mê Linh (Gobox kho 65) -> cộng vào Kho Mê Linh 2
     try:
         l65=gb_all(gtok,'/open/api/reports/warehouse-export-by-sku',{'start_date':NGAY,'end_date':NGAY,'warehouse_id':65,'limit':1000})
@@ -131,11 +137,7 @@ def sync_gobox(ltok):
             if q>0: xk_recs.append({'Ngày đóng gói':DATE_MS,'G SKU':str(g),'Số lượng':int(q),'Kho xuất':'Kho Mê Linh 2','Loại':'Xuất Bán hàng','Ghi chú':'Kho Mê Linh (GB65)'})
         if a65: print('  + Kho Mê Linh (GB65):',len(a65),'GSKU /',int(sum(a65.values())),'đv')
     except Exception as e: print('  kho65 skip:',e)
-    # Bước 1: Section 1A -> ML2 Xuất Bán hàng
-    for sku,name,qty in s1a:
-        g=sku2g.get(sku.lower()) or name2g.get(_norm(name))
-        if not g: unmapped.append(('1A',sku,name,qty)); continue
-        if qty>0: xk_recs.append({'Ngày đóng gói':DATE_MS,'G SKU':str(g),'Số lượng':int(qty),'Kho xuất':'Kho Mê Linh 2','Loại':'Xuất Bán hàng'})
+    # Bước 1 (Xuất Bán hàng ML2) GIỜ lấy từ Gobox MLP ở trên — KHÔNG dùng Section 1A nữa.
     # Bước 2: Section 1B -> ML2 Xuất Gia công
     for sku,name,qty in s1b:
         g=sku2g.get(sku.lower()) or name2g.get(_norm(name))
