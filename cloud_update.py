@@ -1,8 +1,19 @@
 # -*- coding: utf-8 -*-
 # Chạy trên GitHub Actions 20:00 VN mỗi ngày: đồng bộ Gobox->Lark, dựng board, gửi cảnh báo Lark.
-import os,json,re,urllib.request,urllib.parse,datetime,math
+import os,json,re,urllib.request,urllib.parse,urllib.error,datetime,math,time
 from collections import defaultdict
 LARK_HOST='https://open.larksuite.com'; GB='https://api.gobox.asia'
+def gopen(req,timeout=60,tries=6):
+    # gọi HTTP có retry khi 429/5xx (Gobox hay chặn tốc độ)
+    for i in range(tries):
+        try:
+            return urllib.request.urlopen(req,timeout=timeout)
+        except urllib.error.HTTPError as e:
+            if e.code in (429,500,502,503,504) and i<tries-1: time.sleep(2*(i+1)); continue
+            raise
+        except urllib.error.URLError:
+            if i<tries-1: time.sleep(2*(i+1)); continue
+            raise
 APP_ID=os.environ['LARK_APP_ID']; APP_SECRET=os.environ['LARK_APP_SECRET']; BASE=os.environ['LARK_APP_TOKEN']
 GCID=os.environ['GOBOX_CLIENT_ID']; GSEC=os.environ['GOBOX_CLIENT_SECRET']; WEBHOOK=os.environ['LARK_WEBHOOK']
 T_SP='tbl7PSQh3Lq5Tlxy'; T_XK='tblIHtLsM4QTMMQJ'; T_CK='tblylArl4EL4AvrX'; T_HOAN='tblhaZvKxCktFtgW'
@@ -34,11 +45,11 @@ def lsearch(tok,tid,fields):
     return out
 def gbtoken():
     body=urllib.parse.urlencode({'grant_type':'client_credentials','client_id':GCID,'client_secret':GSEC}).encode()
-    return json.load(urllib.request.urlopen(urllib.request.Request(GB+'/oauth/token',data=body,headers={'Accept':'application/json'}),timeout=30))['access_token']
+    return json.load(gopen(urllib.request.Request(GB+'/oauth/token',data=body,headers={'Accept':'application/json'}),30))['access_token']
 def gb_all(tok,path,params):
     url=GB+path+'?'+urllib.parse.urlencode(params,doseq=True); H={'Authorization':'Bearer '+tok,'Accept':'application/json'}; out=[];p=0
     while url:
-        d=json.load(urllib.request.urlopen(urllib.request.Request(url,headers=H),timeout=120)); out+=d.get('data',[]);p+=1
+        d=json.load(gopen(urllib.request.Request(url,headers=H),120)); out+=d.get('data',[]);p+=1; time.sleep(0.4)
         url=d.get('meta',{}).get('cursor',{}).get('next')
         if p>80:break
     return out
@@ -385,7 +396,7 @@ def sync_hanghoan(ltok,ngay):
     qty=_dd(float);pg=1
     while pg<=80:
         url=GB+'/open/api/orders?'+urllib.parse.urlencode({'warehouse_id':WID,'is_return':1,'limit':200,'page':pg,'include[]':'items'})
-        d=json.load(urllib.request.urlopen(urllib.request.Request(url,headers={'Authorization':'Bearer '+gtok,'Accept':'application/json'}),timeout=60))
+        d=json.load(gopen(urllib.request.Request(url,headers={'Authorization':'Bearer '+gtok,'Accept':'application/json'}),60))
         data=d.get('data',[])
         if not data: break
         recent=False
