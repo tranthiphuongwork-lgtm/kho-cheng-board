@@ -65,6 +65,12 @@ def _t2g_maps(tok):
             if sk and nm: sku2name[str(sk).strip().lower()]=nm
     return sku2g,sku2name,name2g
 def _norm(s): return re.sub(r'\s+',' ',(s or '').strip()).lower()
+KALLE_KEEP=('dark beauty','first love','venus','jasmine amber','girl power','blue shirt','ladykiller','lady killer')
+def kalle_alert_ok(name,hang):
+    # Kalle: chỉ cảnh báo hết hàng cho 7 mùi; mùi khác bỏ qua. Hãng khác luôn cảnh báo.
+    if (hang or '').strip()!='Kalle': return True
+    n=_norm(name)
+    return any(k in n for k in KALLE_KEEP)
 def _ck_tensp(tok):
     r=urllib.request.Request(LARK_HOST+f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_CK}/fields?page_size=200',headers={'Authorization':'Bearer '+tok})
     for f in json.load(urllib.request.urlopen(r,timeout=40))['data']['items']:
@@ -265,6 +271,7 @@ def build_index(rows):
 def alert(tok,rows):
     al=[]
     for r in rows:
+        if not kalle_alert_ok(r.get('name'),r.get('hang')): continue
         ton=r['ac_t']+r['ml1_t']+r['ml2_t']; mn=r['min_ac']+r['min_ml2']; rate=mn/45 if mn else 0
         if rate>0 and (ton<=0 or ton<mn):
             al.append((r['name'],ton,r['buy']))
@@ -365,6 +372,7 @@ def send_day_reports(tok,ngay):
     risk=[]
     for g,v in inv.items():
         if g in TRIO or v.get('tb') or v['hang'] not in ('Cheng','Kalle') or v['pl']=='NVL': continue
+        if not kalle_alert_ok(v['name'],v['hang']): continue
         r=rate(g)
         if r>0 and 0<v['ton']<r*7: risk.append({'name':v['name'],'rate':round(r,1),'ton':int(v['ton']),'days':round(v['ton']/r,1)})
     risk=sorted(risk,key=lambda x:-x['rate'])[:10]
