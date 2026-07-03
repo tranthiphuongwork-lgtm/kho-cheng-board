@@ -171,7 +171,8 @@ def sync_gobox(ltok):
         if not opt: unmapped.append(('S2+GC',sku,name,gc)); continue
         ck_recs.append({'Ngày':DATE_MS,'Loại nhập kho':'Nhập combo','Tên SP':opt,'Số lượng':int(gc),'Kho nhập':'Mê Linh 2'})
     # --- Dedup + ghi Xuất kho (xoá hết record ngày này) ---
-    ex=[it['record_id'] for it in lsearch(ltok,T_XK,['Ngày đóng gói']) if it['fields'].get('Ngày đóng gói')==DATE_MS]
+    _SYNC_LOAI={'Xuất Bán hàng','Xuất Gia công'}  # chi xoa loai do sync tao; GIU manual (Xuat luu kho, Xuat Huy hang)
+    ex=[it['record_id'] for it in lsearch(ltok,T_XK,['Ngày đóng gói','Loại']) if it['fields'].get('Ngày đóng gói')==DATE_MS and gt(it['fields'].get('Loại')) in _SYNC_LOAI]
     for i in range(0,len(ex),500): lpost(ltok,f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_XK}/records/batch_delete',{'records':ex[i:i+500]})
     for i in range(0,len(xk_recs),500): lpost(ltok,f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_XK}/records/batch_create',{'records':[{'fields':r} for r in xk_recs[i:i+500]]})
     # --- Dedup + ghi Chuyển kho (chỉ Nhập combo ngày này) ---
