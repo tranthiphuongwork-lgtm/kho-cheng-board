@@ -111,7 +111,7 @@ def gb_pending(gtok,ngay):
 def sync_gobox(ltok):
     NGAY=datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7))).date().isoformat()
     vn=datetime.timezone(datetime.timedelta(hours=7)); DATE_MS=int(datetime.datetime.strptime(NGAY,'%Y-%m-%d').replace(tzinfo=vn).timestamp()*1000)
-    if any(it['fields'].get('Ngày đóng gói')==DATE_MS for it in lsearch(ltok,T_XK,['Ngày đóng gói'])):
+    if any(it['fields'].get('Ngày đóng gói')==DATE_MS and gt(it['fields'].get('Loại'))=='Xuất Bán hàng' for it in lsearch(ltok,T_XK,['Ngày đóng gói','Loại'])):
         return NGAY,{'status':'already'}
     # --- Âu Cơ từ Gobox (giữ nguyên) ---
     gtok=gbtoken()
