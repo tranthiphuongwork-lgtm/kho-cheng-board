@@ -1,21 +1,18 @@
 # -*- coding: utf-8 -*-
-"""Lịch luân chuyển hàng về kho vệ tinh (B4) -> dashboard GitHub Pages + thẻ Lark.
-ML1 (kho tổng) chuyển hết, không có tồn tối thiểu. ML2 giữ tối thiểu 1 tháng bán.
-Âu Cơ điền tới ROT_AC_DAYS ngày. Hàng Kalle KHÔNG chuyển ra Âu Cơ. Tròn thùng."""
+"""Lịch luân chuyển hàng về kho vệ tinh (B4) -> thẻ Lark + trang xác nhận Render."""
 import os, math, json, html, datetime, urllib.request
 from collections import defaultdict
 import cloud_update as M
 
-AC_DAYS       = float(os.getenv("ROT_AC_DAYS", "30"))       # Âu Cơ điền tới bao nhiêu ngày bán
-ML2_MIN_DAYS  = float(os.getenv("ROT_ML2_MIN_DAYS", "30"))  # ML2 tồn tối thiểu = số ngày bán (mặc định 1 tháng)
-KALLE_NO_AUCO = os.getenv("ROT_KALLE_NO_AUCO", "1") == "1"  # hàng Kalle KHÔNG chuyển ra Âu Cơ
-PAGES_URL     = os.getenv("ROT_PAGES_URL", "https://tranthiphuongwork-lgtm.github.io/kho-cheng-board/transfer.html")
-OUT_HTML      = os.getenv("ROT_OUT_HTML", "transfer.html")
+AC_DAYS       = float(os.getenv("ROT_AC_DAYS", "30"))
+ML2_MIN_DAYS  = float(os.getenv("ROT_ML2_MIN_DAYS", "30"))
+KALLE_NO_AUCO = os.getenv("ROT_KALLE_NO_AUCO", "1") == "1"
+CONFIRM_URL   = os.getenv("ROT_CONFIRM_URL", "https://larkbot-laj5.onrender.com/transfer-confirm?token=Yl87CkKIQskunk09DIAbDcNCK6bJ5xcK")
 VN = datetime.timezone(datetime.timedelta(hours=7))
 
 def build_rows(tok):
     may = M.may_cache(); shopee = M.shopee_rates(tok)
-    tp = M.lsearch(tok, M.T_SP, ['G SKU','Tên sản phẩm','Phân loại','Hãng','Tồn kho Âu Cơ',
+    tp = M.lsearch(tok, M.T_SP, ['G SKU','SKU','Tên sản phẩm','Phân loại','Hãng','Đơn vị tính','Tồn kho Âu Cơ',
                                  'Kho Mê Linh 1','Kho Mê Linh 2','Quy cách'])
     inv = {}
     for it in tp:
@@ -25,7 +22,7 @@ def build_rows(tok):
             'name': M.gt(f.get('Tên sản phẩm')) or str(g),
             'cat': (M.gt(f.get('Phân loại')) or '').strip() or 'Khác',
             'hang': (M.gt(f.get('Hãng')) or '—').strip(),
-            'qc': M.fv(f.get('Quy cách')),
+            'qc': M.fv(f.get('Quy cách')), 'sku': M.gt(f.get('SKU')) or '', 'dvt': (M.gt(f.get('Đơn vị tính')) or '').strip(),
             'ac': M.fv(f.get('Tồn kho Âu Cơ')), 'ml1': M.fv(f.get('Kho Mê Linh 1')),
             'ml2': M.fv(f.get('Kho Mê Linh 2')),
         }
@@ -45,7 +42,8 @@ def build_rows(tok):
     rows = []
     for g, v in inv.items():
         if g in M.TRIO: continue
-        rows.append({**v, 'g': g, 'ar': rate(g, 'Kho Âu Cơ', 'ac'), 'mr': rate(g, 'Kho Mê Linh 2', 'ml2')})
+        v = {**v, 'g': g, 'ar': rate(g, 'Kho Âu Cơ', 'ac'), 'mr': rate(g, 'Kho Mê Linh 2', 'ml2')}
+        rows.append(v)
     return rows
 
 def plan_transfers(rows):
@@ -56,22 +54,20 @@ def plan_transfers(rows):
         ar, mr = v['ar'], v['mr']
         kalle = (v['hang'] == 'Kalle')
         ac_t = math.ceil(ar * AC_DAYS)
-        ml2_min = math.ceil(mr * ML2_MIN_DAYS)       # ML2 tồn tối thiểu (1 tháng bán)
+        ml2_min = math.ceil(mr * ML2_MIN_DAYS)
         ml1_left, ml2_left, ac = v['ml1'], v['ml2'], v['ac']
-        # 1) Âu Cơ thiếu -> ML1 trước (chuyển hết), rồi ML2 (BỎ hàng Kalle)
         if not (KALLE_NO_AUCO and kalle):
             need = max(0, ac_t - ac)
-            if need > 0 and ml1_left > 0:            # ML1: kho tổng, không tồn tối thiểu, chuyển hết (được về 0)
+            if need > 0 and ml1_left > 0:
                 give = tron(min(need, ml1_left))
                 if give > 0:
                     ml1_left -= give; need -= give
                     out.append({'src': 'Mê Linh 1', 'dst': 'Âu Cơ', **v, 'qty': give, 'src_min': None, 'src_left': int(ml1_left)})
-            if need > 0:                             # ML2: chỉ cho phần dư trên tồn tối thiểu (không về 0)
+            if need > 0:
                 give = tron(min(need, max(0, ml2_left - ml2_min)))
                 if give > 0 and ml2_left - give > 0:
                     ml2_left -= give; need -= give
                     out.append({'src': 'Mê Linh 2', 'dst': 'Âu Cơ', **v, 'qty': give, 'src_min': int(ml2_min), 'src_left': int(ml2_left)})
-        # 2) ML2 dưới tồn tối thiểu -> lấy ML1 bù (ML1 chuyển hết)
         need2 = max(0, ml2_min - ml2_left)
         if need2 > 0 and ml1_left > 0:
             give = tron(min(need2, ml1_left))
@@ -83,50 +79,8 @@ def plan_transfers(rows):
 def _vn(n):
     try: return f"{int(n):,}".replace(",", ".")
     except: return str(n)
-def _esc(s): return html.escape(str(s))
-ROUTE_ORDER = ['Mê Linh 1 → Âu Cơ', 'Mê Linh 2 → Âu Cơ', 'Mê Linh 1 → Mê Linh 2']
 
-def build_dashboard_html(transfers, mode, ngay):
-    routes = defaultdict(list)
-    for t in transfers: routes[f"{t['src']} → {t['dst']}"].append(t)
-    keys = sorted(routes, key=lambda k: ROUTE_ORDER.index(k) if k in ROUTE_ORDER else 99)
-    mode_txt = "CHUẨN BỊ hàng để chuyển" if mode == 'prep' else "LỆNH CHUYỂN KHO"
-    sections = ""
-    for k in keys:
-        items = routes[k]; sub = sum(i['qty'] for i in items)
-        cats = defaultdict(list)
-        for it in items: cats[it['cat']].append(it)
-        rows_html = ""; idx = 0
-        for cat in sorted(cats, key=lambda c: -sum(i['qty'] for i in cats[c])):
-            ci = sorted(cats[cat], key=lambda i: -i['qty']); csub = sum(i['qty'] for i in ci)
-            rows_html += f'<tr class=cathead><td></td><td>📂 {_esc(cat)} <span class=mut>({len(ci)} mã)</span></td><td>{_vn(csub)}</td><td colspan=3></td></tr>'
-            for it in ci:
-                idx += 1; qc = it['qc'] or 0
-                box = f'{int(it["qty"]/qc)} thùng' if qc and it["qty"] % qc == 0 else '—'
-                sm = '—' if it['src_min'] is None else _vn(it['src_min'])
-                rows_html += (f'<tr><td class=stt>{idx}</td><td class=name>{_esc(it["name"])}</td>'
-                              f'<td class=q>{_vn(it["qty"])}</td><td>{box}</td>'
-                              f'<td>{sm}</td><td>{_vn(it["src_left"])}</td></tr>')
-        sections += (f'<div class=route><h3><span>🔄 {_esc(k)}</span><span>{_vn(sub)} sp · {len(items)} mã</span></h3>'
-                     f'<table><thead><tr><th class=stt>#</th><th>Sản phẩm</th><th>SL chuyển</th><th>Số thùng</th>'
-                     f'<th>Tồn tối thiểu<br>kho xuất</th><th>Tồn còn lại<br>kho xuất</th></tr></thead><tbody>{rows_html}</tbody></table></div>')
-    return f"""<!DOCTYPE html><html lang=vi><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
-<title>{mode_txt} — {ngay}</title><style>
-*{{box-sizing:border-box;margin:0;padding:0}}body{{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f4f6fb;color:#1f2933;padding:16px;max-width:1100px;margin:0 auto}}
-h1{{font-size:20px;color:#1F4E78}}.sub{{color:#667085;font-size:13px;margin:6px 0 14px}}
-.route{{margin:16px 0}}.route h3{{font-size:15px;color:#fff;background:linear-gradient(135deg,#e67e22,#d35400);padding:10px 14px;border-radius:10px 10px 0 0;display:flex;justify-content:space-between}}
-table{{width:100%;border-collapse:collapse;background:#fff;border-radius:0 0 10px 10px;overflow:hidden;box-shadow:0 1px 4px rgba(16,24,40,.06)}}
-th,td{{padding:8px 9px;font-size:12.5px;text-align:right;border-bottom:1px solid #eef0f4}}th{{background:#2E75B6;color:#fff;white-space:nowrap;font-size:11.5px}}
-th:nth-child(2),td.name{{text-align:left}}td.stt,th.stt{{text-align:center;color:#98a2b3;width:34px}}
-tr:hover td{{background:#f8fafc}}.q{{font-weight:700;color:#d35400}}.mut{{color:#98a2b3;font-weight:400}}
-tr.cathead td{{background:#fdf1e7;font-weight:700;color:#d35400;font-size:12px}}
-.foot{{color:#98a2b3;font-size:11px;margin-top:14px;text-align:center}}</style></head><body>
-<h1>{'📋' if mode=='prep' else '🔄'} {mode_txt} — {ngay}</h1>
-<div class=sub>{'Danh sách để kho Mê Linh soạn trước (chuyển vào ngày 17/27).' if mode=='prep' else 'Thực hiện chuyển hôm nay.'}
-· Tổng <b>{_vn(sum(t['qty'] for t in transfers))}</b> sp · Ưu tiên lấy Mê Linh 1 (chuyển hết), ML1 hết mới lấy Mê Linh 2. ML2 giữ tối thiểu {int(ML2_MIN_DAYS)} ngày bán · hàng Kalle không chuyển ra Âu Cơ.</div>
-{sections}
-<div class=foot>Tự động · Kho Cheng · Âu Cơ mục tiêu {int(AC_DAYS)} ngày · Cột "Tồn còn lại" = tồn kho xuất sau khi trừ SL chuyển.</div>
-</body></html>"""
+ROUTE_ORDER = ['Mê Linh 1 → Âu Cơ', 'Mê Linh 2 → Âu Cơ', 'Mê Linh 1 → Mê Linh 2']
 
 def build_card(transfers, mode, ngay, url):
     grand = sum(t['qty'] for t in transfers)
@@ -143,7 +97,7 @@ def build_card(transfers, mode, ngay, url):
             "elements": [
                 {"tag": "div", "text": {"tag": "lark_md", "content": body}},
                 {"tag": "action", "actions": [
-                    {"tag": "button", "text": {"tag": "plain_text", "content": "📋 Mở bảng chi tiết"},
+                    {"tag": "button", "text": {"tag": "plain_text", "content": "✅ Xác nhận & chỉnh số"},
                      "type": "primary", "url": url}]}]}
 
 def send(card):
@@ -151,6 +105,35 @@ def send(card):
     urllib.request.urlopen(urllib.request.Request(
         M.WEBHOOK, data=json.dumps(body).encode(),
         headers={"Content-Type": "application/json"}, method="POST"), timeout=30)
+
+def _bot_state_set(tok, key, value):
+    r = urllib.request.Request(M.LARK_HOST + f"/open-apis/bitable/v1/apps/{M.BASE}/tables?page_size=100",
+                               headers={"Authorization": "Bearer " + tok})
+    tid = None
+    for it in json.load(urllib.request.urlopen(r, timeout=30))["data"]["items"]:
+        if it["name"] == "Bot_State": tid = it["table_id"]; break
+    if not tid:
+        print("Khong thay bang Bot_State"); return
+    rid = None
+    for it in M.lsearch(tok, tid, ["Key", "Value"]):
+        if M.gt(it["fields"].get("Key")) == key: rid = it["record_id"]; break
+    if rid:
+        req = urllib.request.Request(M.LARK_HOST + f"/open-apis/bitable/v1/apps/{M.BASE}/tables/{tid}/records/{rid}",
+              data=json.dumps({"fields": {"Value": str(value)}}).encode(), method="PUT",
+              headers={"Authorization": "Bearer " + tok, "Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=30)
+    else:
+        M.lpost(tok, f"/open-apis/bitable/v1/apps/{M.BASE}/tables/{tid}/records/batch_create",
+                {"records": [{"fields": {"Key": key, "Value": str(value)}}]})
+
+def _make_draft(transfers, ngay):
+    rows = []
+    for t in transfers:
+        rows.append({"src": t["src"], "dst": t["dst"], "gsku": t.get("g"), "sku": t.get("sku") or "",
+                     "name": t["name"], "cat": t.get("cat") or "", "qc": int(t.get("qc") or 0),
+                     "dvt": t.get("dvt") or "", "qty": int(t["qty"]),
+                     "src_stock": int(t["ml1"] if t["src"] == "Mê Linh 1" else t["ml2"])})
+    return {"ngay": ngay, "rows": rows}
 
 def main():
     now = datetime.datetime.now(VN); day = now.day
@@ -162,9 +145,9 @@ def main():
     if not transfers:
         print("Không có hàng cần chuyển."); return
     ngay = now.strftime('%d/%m/%Y')
-    open(OUT_HTML, 'w', encoding='utf-8').write(build_dashboard_html(transfers, mode, ngay))
-    send(build_card(transfers, mode, ngay, PAGES_URL))
-    print(f"Đã ghi {OUT_HTML} + gửi thẻ {mode}: {len(transfers)} dòng.")
+    _bot_state_set(tok, "transfer_draft", json.dumps(_make_draft(transfers, ngay), ensure_ascii=False))
+    send(build_card(transfers, mode, ngay, CONFIRM_URL))
+    print(f"Đã lưu draft + gửi thẻ {mode}: {len(transfers)} dòng.")
 
 if __name__ == '__main__':
     main()
