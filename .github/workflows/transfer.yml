@@ -12,6 +12,8 @@ on:
 jobs:
   run:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -30,3 +32,10 @@ jobs:
           ROT_ML2_DAYS: '30'
           ROT_ML2_KEEP_DAYS: '15'
         run: python transfer_schedule.py
+      - name: Publish dashboard to Pages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add transfer.html
+          git commit -m "update transfer dashboard" || echo "no change"
+          git push
