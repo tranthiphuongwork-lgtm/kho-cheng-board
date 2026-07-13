@@ -1,0 +1,32 @@
+name: transfer-schedule
+on:
+  schedule:
+    # 01:00 UTC = 08:00 giờ VN, vào ngày 15,17,25,27 hằng tháng
+    - cron: '0 1 15,17,25,27 * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Ép chế độ để test: prep hoặc transfer (để trống = tự theo ngày)'
+        required: false
+        default: 'prep'
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run transfer schedule
+        env:
+          LARK_APP_ID: ${{ secrets.LARK_APP_ID }}
+          LARK_APP_SECRET: ${{ secrets.LARK_APP_SECRET }}
+          LARK_APP_TOKEN: ${{ secrets.LARK_APP_TOKEN }}
+          LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK }}
+          GOBOX_CLIENT_ID: ${{ secrets.GOBOX_CLIENT_ID }}
+          GOBOX_CLIENT_SECRET: ${{ secrets.GOBOX_CLIENT_SECRET }}
+          ROT_MODE: ${{ github.event.inputs.mode }}
+          ROT_AC_DAYS: '30'
+          ROT_ML2_DAYS: '30'
+          ROT_ML2_KEEP_DAYS: '15'
+        run: python transfer_schedule.py
