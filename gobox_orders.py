@@ -47,6 +47,9 @@ F_PAYTXT  = [s for s in os.getenv("GOBOX_ORDER_PAYTXT_FIELD",  "payment_method_t
 F_COD     = [s for s in os.getenv("GOBOX_ORDER_COD_FIELD",     "cod").split(",") if s]
 F_DATE    = [s for s in os.getenv("GOBOX_ORDER_DATE_FIELD",    "create_time,created_at,order_date,done_at").split(",") if s]
 F_PLATF   = [s for s in os.getenv("GOBOX_ORDER_PLATFORM_FIELD","platform").split(",") if s]
+F_PLATFNAME = ["platform_name"]
+# Chi doi chieu don POS (platform_name chua "pos"). De trong = khong loc.
+POS_ONLY = [s.strip() for s in os.getenv("GOBOX_ORDER_PLATFORMS", "pos").split(",") if s.strip()]
 # So tien THUC TRA (uu tien khop) va cac thanh phan de suy ra net = subtotal - discount
 F_PAID     = [s for s in os.getenv("GOBOX_ORDER_PAID_FIELD",     "total_amount,total_paid,paid_amount,final_amount,grand_total,payment_amount,transfer_amount").split(",") if s]
 F_SUBTOTAL = [s for s in os.getenv("GOBOX_ORDER_SUBTOTAL_FIELD", "subtotal,sub_total,items_total,total_price,goods_amount,order_amount").split(",") if s]
@@ -55,9 +58,9 @@ F_DISCOUNT = [s for s in os.getenv("GOBOX_ORDER_DISCOUNT_FIELD", "discount,disco
 # "chuyen khoan": khop txt chua 1 trong cac chuoi nay (khong dau, thuong)
 TRANSFER_TXT = [s.strip() for s in os.getenv(
     "GOBOX_TRANSFER_TXT",
-    "chuyen khoan,chuyenkhoan,transfer,bank,vietqr,qr,ck").split(",") if s.strip()]
+    "the ngan hang,ngan hang,chuyen khoan,chuyenkhoan,transfer,bank,vietqr,qr,ck").split(",") if s.strip()]
 # Neu biet ma so PTTT chuyen khoan (int) -> dien vao day (vd "2"); de trong = chi dung txt.
-TRANSFER_CODE = os.getenv("GOBOX_TRANSFER_CODE", "").strip()
+TRANSFER_CODE = os.getenv("GOBOX_TRANSFER_CODE", "2").strip()   # 2 = "The ngan hang" (POS chuyen khoan)
 
 PROBE_PATHS = [s.strip() for s in os.getenv("GOBOX_PROBE_PATHS", ",".join([
     "/open/api/orders",
@@ -269,6 +272,7 @@ def normalize(row):
         "pay_txt": str(ptxt) if ptxt is not None else "",
         "date": _date10(dt),
         "platform": plat,
+        "platform_name": (_first(o, F_PLATFNAME)[0] if F_PLATFNAME else None),
         "raw": o,
     }
 
@@ -332,6 +336,10 @@ def classify(start_date, end_date):
             continue
         if n["date"] and not (start_date <= n["date"] <= end_date):
             continue
+        if POS_ONLY:
+            pn = _no_accent(n.get("platform_name"))
+            if not any(x in pn for x in POS_ONLY):
+                continue
         g["all"].append(n)
         if is_transfer(n):
             g["transfer"].append(n)
