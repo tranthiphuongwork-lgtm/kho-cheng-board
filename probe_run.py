@@ -1,31 +1,53 @@
 # -*- coding: utf-8 -*-
-"""Chay DO endpoint Gobox + in ket qua de doc (dung tren GitHub Actions/Render log).
+"""DO Gobox: thu nhieu BASE de tim cai xin duoc token, roi do endpoint don hang.
     python probe_run.py 2026-07-14
 """
-import sys, json, datetime
+import sys, os, json, datetime
 import gobox as GB
 import gobox_orders as GO
 TZ = datetime.timezone(datetime.timedelta(hours=7))
 d = sys.argv[1] if len(sys.argv) > 1 else datetime.datetime.now(TZ).date().isoformat()
 
-# In ro cau hinh dang dung (de chan doan)
 sec = GB.CSEC or ""
-print("GOBOX_BASE dang dung:", repr(GB.BASE))
-print("GOBOX_CLIENT_ID     :", repr(GB.CID))
-print("GOBOX_CLIENT_SECRET :", (sec[:4] + "..." + sec[-4:]) if len(sec) > 8 else "(rong/ngan)", "| do dai:", len(sec))
-print("GRANT_TYPE          :", repr(GB.GRANT))
+print("CLIENT_ID :", repr(GB.CID))
+print("SECRET    :", (sec[:4] + "..." + sec[-4:]) if len(sec) > 8 else "(rong)", "| do dai:", len(sec))
+print("GRANT     :", repr(GB.GRANT))
+print("=" * 60)
 
-# Thu lay token truoc, in ro
-tok, terr = GB.get_token(force=True)
-print("TOKEN:", "OK (do dai %d)" % len(tok) if tok else "LOI -> " + str(terr))
-print("-" * 60)
+# Danh sach base ung vien: uu tien GOBOX_BASE (env) neu co, roi cac base pho bien
+cands = []
+env_base = os.getenv("GOBOX_BASE", "").strip().rstrip("/")
+if env_base:
+    cands.append(env_base)
+for b in ["https://dev-api.gobox.asia", "https://api.gobox.asia",
+          "http://dev-api.gobox.asia", "http://api.gobox.asia"]:
+    if b not in cands:
+        cands.append(b)
 
+good = None
+for b in cands:
+    GB.BASE = b
+    GB._TOK = {"val": None, "exp": 0}
+    tok, terr = GB.get_token(force=True)
+    if tok:
+        print("BASE", b, "-> TOKEN OK (do dai %d)" % len(tok))
+        good = b
+        break
+    else:
+        # rut gon loi cho de doc
+        msg = str(terr)
+        print("BASE", b, "-> LOI:", (msg[:140] + "...") if len(msg) > 140 else msg)
+
+if not good:
+    print("\n>>> KHONG base nao xin duoc token. Kiem tra lai client_id/secret voi ben Gobox.")
+    sys.exit(0)
+
+print("\n===> BASE DUNG:", good, " (dat GOBOX_BASE = base nay)")
+print("=" * 60)
+GB.BASE = good
+GB._TOK = {"val": None, "exp": 0}
 rep = GO.probe(d, d)
-print("BASE:", rep.get("base"))
-if not rep.get("ok"):
-    print("LOI:", rep.get("err")); sys.exit(0)
-he = rep.get("helpers_err")
-print("Helper (enum PTTT) loi:", he if he else "OK - xem helpers_sample de tim ma 'Chuyen khoan'/'Tien mat'")
+print("Helper enum PTTT:", "loi " + str(rep.get("helpers_err")) if rep.get("helpers_err") else "OK")
 print("helpers_sample:", json.dumps(rep.get("helpers_sample"), ensure_ascii=False)[:800])
 for e in rep.get("tried", []):
     print("\n--- Endpoint:", e["path"], "| so ban ghi:", e["n"], "| loi:", e["err"])
@@ -34,7 +56,6 @@ for e in rep.get("tried", []):
         print("   Doan  ma don :", e.get("guess_code"))
         print("   Doan doanh thu:", e.get("guess_amount"))
         print("   Doan PTTT(txt):", e.get("guess_paytxt"))
-        print("   Doan ngay     :", e.get("guess_date"))
-        print("   Don mau       :", json.dumps(e.get("sample"), ensure_ascii=False)[:1200])
-print("\n===== JSON DAY DU (copy gui lai de chot cau hinh) =====")
+        print("   Don mau:", json.dumps(e.get("sample"), ensure_ascii=False)[:1400])
+print("\n===== JSON DAY DU =====")
 print(json.dumps(rep, ensure_ascii=False))
