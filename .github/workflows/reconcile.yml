@@ -1,8 +1,6 @@
 name: reconcile-transfer-vs-bank
 # Doi chieu doanh thu don POS chuyen khoan (Gobox) vs tien vao (Lark Sao ke).
-# Chay tren GitHub Actions vi runner GOI DUOC Gobox (khac sandbox Cowork bi chan).
-# Tu xuat Excel + gui thong bao (thẻ + dinh kem file) len nhom Lark.
-
+# Credential Gobox/Lark da ghi san trong gobox.py/config.py -> chi can secret GOBOX_BASE.
 on:
   schedule:
     - cron: "0 1 * * *"   # 08:00 gio VN moi ngay (UTC+7)
@@ -18,7 +16,6 @@ on:
         description: "Gui thong bao Lark? (1/0)"
         required: false
         default: "1"
-
 jobs:
   reconcile:
     runs-on: ubuntu-latest
@@ -31,14 +28,8 @@ jobs:
         run: pip install openpyxl
       - name: Run reconcile (xuat Excel + gui Lark)
         env:
-          GOBOX_BASE: ${{ secrets.GOBOX_BASE }}               # vd https://dev-api.gobox.asia
-          GOBOX_CLIENT_ID: ${{ secrets.GOBOX_CLIENT_ID }}     # 25
-          GOBOX_CLIENT_SECRET: ${{ secrets.GOBOX_CLIENT_SECRET }}
-          GOBOX_ORDER_PLATFORM: "6"                           # chi don POS
-          # GOBOX_TRANSFER_CODE: "2"   # dien sau khi biet ma so PTTT chuyen khoan
-          LARK_APP_ID: ${{ secrets.LARK_APP_ID }}
-          LARK_APP_SEC: ${{ secrets.LARK_APP_SEC }}
-          LARK_CONFIRM_CHAT_ID: ${{ secrets.LARK_CONFIRM_CHAT_ID }}   # nhom nhan thong bao
+          GOBOX_BASE: ${{ secrets.GOBOX_BASE }}
+          GOBOX_ORDER_PLATFORM: "6"
           RECON_NOTIFY: ${{ github.event.inputs.notify || '1' }}
         run: |
           python reconcile.py ${{ github.event.inputs.start }} ${{ github.event.inputs.end }}
