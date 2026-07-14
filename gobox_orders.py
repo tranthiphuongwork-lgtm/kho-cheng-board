@@ -31,7 +31,7 @@ LIMIT       = int(os.getenv("GOBOX_ORDER_LIMIT", "100"))
 P_START     = os.getenv("GOBOX_ORDER_START_PARAM", "start_create_date")
 P_END       = os.getenv("GOBOX_ORDER_END_PARAM",   "end_create_date")
 # Loc platform POS (theo user: don chi len o POS). De trong = khong loc.
-PLATFORM    = os.getenv("GOBOX_ORDER_PLATFORM", "6")
+PLATFORM    = os.getenv("GOBOX_ORDER_PLATFORM", "")   # de trong: khong loc platform (POS=6 tra 0)
 P_PLATFORM  = os.getenv("GOBOX_ORDER_PLATFORM_PARAM", "platform")
 # Loc kho (tuy chon)
 WH_IDS      = [s.strip() for s in os.getenv("GOBOX_WH_IDS", "").split(",") if s.strip()]
@@ -201,23 +201,29 @@ def probe(start_date, end_date):
 
 
 # ---------------- FETCH THAT ----------------
+MAX_PAGES = int(os.getenv("GOBOX_ORDER_MAX_PAGES", "60"))
+
 def fetch_orders(start_date, end_date):
+    """Keo don theo trang. Don sap xep moi->cu nen DUNG SOM khi ca trang < start_date."""
     token, err = GB.get_token()
     if err:
         return [], "token: " + err
-    base = _params(start_date, end_date, LIMIT)
-    if "pickings" in ORDERS_PATH and not INCLUDE:
-        base["include"] = "order"
-    rows_all, wh_list = [], (WH_IDS or [None])
-    for wh in wh_list:
-        p = dict(base)
-        if wh:
-            p[P_WAREHOUSE] = wh
-        rows, e = _get_all(token, ORDERS_PATH, p)
+    out = []
+    for page in range(1, MAX_PAGES + 1):
+        p = _params(start_date, end_date, LIMIT, page=page)
+        if "pickings" in ORDERS_PATH and not INCLUDE:
+            p["include"] = "order"
+        d, rows, e = _get(token, ORDERS_PATH, p)
         if e:
-            return rows_all, e
-        rows_all += rows
-    return rows_all, None
+            return out, e
+        out += rows
+        if len(rows) < LIMIT:
+            break
+        ds = [normalize(r)["date"] for r in rows if r]
+        ds = [x for x in ds if x]
+        if ds and max(ds) < start_date:
+            break
+    return out, None
 
 
 
@@ -323,6 +329,8 @@ def classify(start_date, end_date):
     for r in rows:
         n = normalize(r)
         if not n["amount"]:
+            continue
+        if n["date"] and not (start_date <= n["date"] <= end_date):
             continue
         g["all"].append(n)
         if is_transfer(n):
