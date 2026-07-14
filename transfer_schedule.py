@@ -12,7 +12,7 @@ import os, math, json, html, datetime, urllib.request
 from collections import defaultdict
 import cloud_update as M
 
-AC_DAYS       = float(os.getenv("ROT_AC_DAYS", "30"))       # Âu Cơ điền tới bao nhiêu ngày bán
+AC_DAYS       = float(os.getenv("ROT_AC_DAYS", "14"))       # Âu Cơ chỉ cần đủ tồn ~2 tuần (chuyển ra thường xuyên)
 ML2_MIN_DAYS  = float(os.getenv("ROT_ML2_MIN_DAYS", "30"))  # ML2 tồn tối thiểu = số ngày bán (mặc định 1 tháng)
 KALLE_NO_AUCO = os.getenv("ROT_KALLE_NO_AUCO", "1") == "1"  # hàng Kalle KHÔNG chuyển ra Âu Cơ
 CONFIRM_URL   = os.getenv("ROT_CONFIRM_URL", "https://larkbot-laj5.onrender.com/transfer-confirm?token=Yl87CkKIQskunk09DIAbDcNCK6bJ5xcK")
