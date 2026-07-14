@@ -1,28 +1,28 @@
 # -*- coding: utf-8 -*-
-"""Doi chieu DOANH THU don POS chuyen khoan (Gobox) vs GIAO DICH TIEN VAO (Lark 'Sao ke').
+"""Doi chieu DOANH THU don chuyen khoan (Gobox) vs GIAO DICH TIEN VAO (Lark 'Sao ke').
+TU CHUA (self-contained): chi phu thuoc gobox.py (qua gobox_orders) + openpyxl.
+Da gop san cac ham Lark (token/list_records/send_card/upload_file) de KHONG can larkbase/config/messaging.
 
-  1) Lay TAT CA don POS -> chia nhom PTTT: chuyen khoan / tien mat / khac.
-  2) Lay giao dich loai 'in' tu bang 'Sao ke' (Lark Base) trong khoang ngay.
+  1) Lay don Gobox trong ngay -> chia nhom PTTT (chuyen khoan / tien mat / khac), loc dung ngay.
+  2) Lay giao dich 'in' tu bang 'Sao ke' (Lark).
   3) Khop don CHUYEN KHOAN <-> tien vao theo SO TIEN (uu tien ma don trong noi dung).
-  4) Phan loai: matched / order_no_txn / txn_no_order.  Bao ca TONG TIEN MAT.
+  4) Xuat Excel + gui thẻ tom tat + dinh kem file len Lark.
 
-Xuat Excel nhieu sheet + gui thong bao (thẻ chi tiet + dinh kem file) len Lark.
-
-Chay:
-  python reconcile.py 2026-07-14
-  python reconcile.py 2026-07-01 2026-07-14 --no-notify
+Chay:  python reconcile.py [start] [end] [--no-notify]
 """
-import os, sys, json, datetime
-import larkbase as L
+import os, sys, json, uuid, datetime, urllib.request
 import gobox_orders as GO
 
 TZ = datetime.timezone(datetime.timedelta(hours=7))
-try:
-    import config as C
-except Exception:
-    C = None
 
-SAOKE_TABLE  = os.getenv("GOBOX_SAOKE_TABLE", "tblQ4FASSV9Y6Ewl")
+# ---- Cau hinh Lark (env hoac mac dinh) ----
+HOST      = os.getenv("LARK_HOST", "https://open.larksuite.com")
+APP_ID    = os.getenv("LARK_APP_ID",  "cli_aa8d66518d619ed1")
+APP_SEC   = os.getenv("LARK_APP_SEC") or os.getenv("LARK_APP_SECRET") or ""   # KHONG ghi cung: doc tu secret
+BASE_APP  = os.getenv("LARK_BASE_APP", "SA7ebfOdLaUJ5fsVILIl1QGag7b")   # app_token cua Base
+SAOKE_TABLE = os.getenv("GOBOX_SAOKE_TABLE", "tblQ4FASSV9Y6Ewl")
+CONFIRM_CHAT = os.getenv("LARK_CONFIRM_CHAT_ID", "") or "oc_d284fd22a122a942ba6985414ecf0352"
+
 F_SK_AMOUNT  = os.getenv("SAOKE_AMOUNT_FIELD", "số tiền")
 F_SK_CONTENT = os.getenv("SAOKE_CONTENT_FIELD", "Nội dung")
 F_SK_TYPE    = os.getenv("SAOKE_TYPE_FIELD", "Loại giao dịch")
@@ -30,40 +30,97 @@ F_SK_DATE    = os.getenv("SAOKE_DATE_FIELD", "Ngày giao dịch")
 F_SK_ID      = os.getenv("SAOKE_ID_FIELD", "ID")
 IN_VALUE     = os.getenv("SAOKE_IN_VALUE", "in")
 TOLERANCE    = int(os.getenv("RECON_TOLERANCE", "0"))
-CARD_MAX     = int(os.getenv("RECON_CARD_MAX", "20"))   # so dong toi da liet ke moi nhom tren thẻ
-CONFIRM_CHAT = os.getenv("LARK_CONFIRM_CHAT_ID",
-                         getattr(C, "CONFIRM_CHAT_ID", "") if C else "") or "oc_d284fd22a122a942ba6985414ecf0352"
+CARD_MAX     = int(os.getenv("RECON_CARD_MAX", "20"))
 NOTIFY_DEFAULT = os.getenv("RECON_NOTIFY", "1") == "1"
 
 
+# ================= LARK HELPERS (gop san) =================
+def lark_token():
+    r = urllib.request.Request(HOST + "/open-apis/auth/v3/tenant_access_token/internal",
+        data=json.dumps({"app_id": APP_ID, "app_secret": APP_SEC}).encode(),
+        headers={"Content-Type": "application/json"}, method="POST")
+    return json.load(urllib.request.urlopen(r, timeout=30))["tenant_access_token"]
+
+def gt(v):
+    if isinstance(v, list): return "".join(x.get("text", "") for x in v if isinstance(x, dict))
+    if isinstance(v, dict): return v.get("value") or v.get("text")
+    return v
+
+def lark_list(t, tid, fields):
+    out, pt = [], None
+    while True:
+        url = HOST + f"/open-apis/bitable/v1/apps/{BASE_APP}/tables/{tid}/records/search?page_size=500" + (("&page_token=" + pt) if pt else "")
+        r = urllib.request.Request(url, data=json.dumps({"field_names": fields}).encode(),
+            headers={"Authorization": "Bearer " + t, "Content-Type": "application/json"}, method="POST")
+        d = json.load(urllib.request.urlopen(r, timeout=60))["data"]; out += d.get("items", [])
+        if d.get("has_more"): pt = d["page_token"]
+        else: break
+    return out
+
+def lark_send_card(t, chat_id, card):
+    body = {"receive_id": chat_id, "msg_type": "interactive", "content": json.dumps(card, ensure_ascii=False)}
+    r = urllib.request.Request(HOST + "/open-apis/im/v1/messages?receive_id_type=chat_id",
+        data=json.dumps(body).encode(), method="POST",
+        headers={"Authorization": "Bearer " + t, "Content-Type": "application/json"})
+    return json.load(urllib.request.urlopen(r, timeout=30))
+
+def lark_upload_file(t, path, fname):
+    boundary = "----recon" + uuid.uuid4().hex
+    with open(path, "rb") as f:
+        content = f.read()
+    parts = []
+    def _add(name, value):
+        parts.append(("--" + boundary).encode())
+        parts.append(f'Content-Disposition: form-data; name="{name}"'.encode()); parts.append(b"")
+        parts.append(str(value).encode())
+    _add("file_type", "stream"); _add("file_name", fname)
+    parts.append(("--" + boundary).encode())
+    parts.append(f'Content-Disposition: form-data; name="file"; filename="{fname}"'.encode())
+    parts.append(b"Content-Type: application/octet-stream"); parts.append(b""); parts.append(content)
+    parts.append(("--" + boundary + "--").encode()); parts.append(b"")
+    data = b"\r\n".join(parts)
+    r = urllib.request.Request(HOST + "/open-apis/im/v1/files", data=data, method="POST",
+        headers={"Authorization": "Bearer " + t, "Content-Type": "multipart/form-data; boundary=" + boundary})
+    d = json.load(urllib.request.urlopen(r, timeout=60))
+    return d.get("data", {}).get("file_key")
+
+def lark_send_file(t, chat_id, file_key):
+    body = {"receive_id": chat_id, "msg_type": "file", "content": json.dumps({"file_key": file_key})}
+    r = urllib.request.Request(HOST + "/open-apis/im/v1/messages?receive_id_type=chat_id",
+        data=json.dumps(body).encode(), method="POST",
+        headers={"Authorization": "Bearer " + t, "Content-Type": "application/json"})
+    return json.load(urllib.request.urlopen(r, timeout=30))
+
+
+# ================= SAO KE =================
 def _to_date(ts_ms):
     try:
         return datetime.datetime.fromtimestamp(int(ts_ms) / 1000, TZ).date().isoformat()
     except Exception:
         return ""
 
-
 def saoke_in(start_date, end_date):
-    t = L.token()
-    rows = L.list_records(t, SAOKE_TABLE, [F_SK_AMOUNT, F_SK_CONTENT, F_SK_TYPE, F_SK_DATE, F_SK_ID])
+    t = lark_token()
+    rows = lark_list(t, SAOKE_TABLE, [F_SK_AMOUNT, F_SK_CONTENT, F_SK_TYPE, F_SK_DATE, F_SK_ID])
     out = []
     for it in rows:
         f = it["fields"]
-        if L.gt(f.get(F_SK_TYPE)) != IN_VALUE:
+        if gt(f.get(F_SK_TYPE)) != IN_VALUE:
             continue
-        d = _to_date(f.get(F_SK_DATE))
-        if not (start_date <= d <= end_date):
+        dd = _to_date(f.get(F_SK_DATE))
+        if not (start_date <= dd <= end_date):
             continue
-        amt = L.gt(f.get(F_SK_AMOUNT))
+        amt = gt(f.get(F_SK_AMOUNT))
         try:
             amt = float(amt)
         except (TypeError, ValueError):
             continue
-        out.append({"amount": amt, "content": L.gt(f.get(F_SK_CONTENT)) or "",
-                    "id": L.gt(f.get(F_SK_ID)) or it.get("record_id"), "date": d})
+        out.append({"amount": amt, "content": gt(f.get(F_SK_CONTENT)) or "",
+                    "id": gt(f.get(F_SK_ID)) or it.get("record_id"), "date": dd})
     return out
 
 
+# ================= DOI CHIEU =================
 def reconcile(orders, txns):
     txns = [dict(x, _used=False) for x in txns]
     matched, order_no_txn = [], []
@@ -129,50 +186,39 @@ def run(start_date, end_date):
 def _fmt(n):
     return f"{int(round(n or 0)):,}".replace(",", ".")
 
-
 def summary_text(r):
     if not r.get("ok"):
         return "LOI (" + str(r.get("stage", "?")) + "): " + str(r.get("err"))
     return "\n".join([
         f"Doi chieu {r['start']}..{r['end']}",
-        f"- Don POS chuyen khoan: {r['n_orders']} · {_fmt(r['sum_orders'])} d",
-        f"- Don POS tien mat: {r['n_cash']} · {_fmt(r['sum_cash'])} d",
+        f"- Don chuyen khoan: {r['n_orders']} · {_fmt(r['sum_orders'])} d",
+        f"- Don tien mat: {r['n_cash']} · {_fmt(r['sum_cash'])} d",
         f"- Tien vao (Sao ke 'in'): {r['n_txn_in']} · {_fmt(r['sum_txn_in'])} d",
-        f"- KHOP: {r['n_matched']} don · {_fmt(r['sum_matched'])} d",
+        f"- KHOP: {r['n_matched']} · {_fmt(r['sum_matched'])} d",
         f"- Don CK chua thay tien vao: {r['n_order_no_txn']} · {_fmt(r['sum_order_no_txn'])} d",
         f"- Tien vao chua khop don: {r['n_txn_no_order']} · {_fmt(r['sum_txn_no_order'])} d",
     ])
 
 
-# ---------------- THẺ LARK ----------------
 def build_card(r):
     def _pct(a, b):
         return f" ({a/b*100:.0f}%)" if b else ""
     tmpl = "green" if r["n_order_no_txn"] == 0 else "orange"
     title = f"📊 Doi chieu CK vs tien vao · {r['start']}" + (f"..{r['end']}" if r['end'] != r['start'] else "")
-
     top = "\n".join([
-        f"**Don POS chuyen khoan:** {r['n_orders']} · {_fmt(r['sum_orders'])} d",
-        f"💵 **Don POS tien mat:** {r['n_cash']} · {_fmt(r['sum_cash'])} d",
+        f"**Don chuyen khoan:** {r['n_orders']} · {_fmt(r['sum_orders'])} d",
+        f"💵 **Don tien mat:** {r['n_cash']} · {_fmt(r['sum_cash'])} d",
         f"**Tien vao (in):** {r['n_txn_in']} · {_fmt(r['sum_txn_in'])} d",
         f"✅ **Khop:** {r['n_matched']}{_pct(r['n_matched'], r['n_orders'])} · {_fmt(r['sum_matched'])} d",
     ])
-
-    def _list_block(title_line, lines):
-        more = ""
+    def _blk(header, lines):
         shown = lines[:CARD_MAX]
-        if len(lines) > CARD_MAX:
-            more = f"\n_… và {len(lines) - CARD_MAX} dòng khác (xem Excel)_"
-        return title_line + ("\n" + "\n".join(shown) if shown else "") + more
-
-    ord_lines = [f"• `{o['code'] or '(không mã)'}` — **{_fmt(o['amount'])} d**  _{o.get('date','')}_"
-                 for o in r["order_no_txn"]]
-    txn_lines = [f"• **{_fmt(x['amount'])} d** — {(x['content'] or '')[:40]}  _{x.get('date','')}_"
-                 for x in r["txn_no_order"]]
-
-    blk_ord = _list_block(f"⚠️ **Don CK chua thay tien vao: {r['n_order_no_txn']} · {_fmt(r['sum_order_no_txn'])} d**", ord_lines)
-    blk_txn = _list_block(f"❔ **Tien vao chua khop don: {r['n_txn_no_order']} · {_fmt(r['sum_txn_no_order'])} d**", txn_lines)
-
+        more = f"\n_… và {len(lines) - CARD_MAX} dòng khác (xem Excel)_" if len(lines) > CARD_MAX else ""
+        return header + ("\n" + "\n".join(shown) if shown else "") + more
+    ord_lines = [f"• `{o['code'] or '(không mã)'}` — **{_fmt(o['amount'])} d**  _{o.get('date','')}_" for o in r["order_no_txn"]]
+    txn_lines = [f"• **{_fmt(x['amount'])} d** — {(x['content'] or '')[:40]}  _{x.get('date','')}_" for x in r["txn_no_order"]]
+    blk_ord = _blk(f"⚠️ **Don CK chua thay tien vao: {r['n_order_no_txn']} · {_fmt(r['sum_order_no_txn'])} d**", ord_lines)
+    blk_txn = _blk(f"❔ **Tien vao chua khop don: {r['n_txn_no_order']} · {_fmt(r['sum_txn_no_order'])} d**", txn_lines)
     return {"config": {"wide_screen_mode": True},
             "header": {"template": tmpl, "title": {"tag": "plain_text", "content": title}},
             "elements": [
@@ -185,102 +231,64 @@ def build_card(r):
             ]}
 
 
-# ---------------- XUAT EXCEL ----------------
 def write_xlsx(r, path):
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
     wb = Workbook()
-    hdr_fill = PatternFill("solid", fgColor="1F4E78"); hdr_font = Font(color="FFFFFF", bold=True); money = '#,##0'
-
-    def _sheet(title, headers, rows, money_cols=()):
+    hf = PatternFill("solid", fgColor="1F4E78"); hfont = Font(color="FFFFFF", bold=True); money = '#,##0'
+    def _sheet(title, headers, rows, mcols=()):
         ws = wb.create_sheet(title); ws.append(headers)
         for c in range(1, len(headers) + 1):
-            cell = ws.cell(1, c); cell.fill = hdr_fill; cell.font = hdr_font; cell.alignment = Alignment(horizontal="center")
-        for row in rows:
-            ws.append(row)
-        for mc in money_cols:
-            for row in range(2, ws.max_row + 1):
-                ws.cell(row, mc).number_format = money
+            cell = ws.cell(1, c); cell.fill = hf; cell.font = hfont; cell.alignment = Alignment(horizontal="center")
+        for row in rows: ws.append(row)
+        for mc in mcols:
+            for row in range(2, ws.max_row + 1): ws.cell(row, mc).number_format = money
         for col in range(1, len(headers) + 1):
             w = max([len(str(headers[col-1]))] + [len(str(ws.cell(rr, col).value or "")) for rr in range(2, ws.max_row + 1)])
             ws.column_dimensions[ws.cell(1, col).column_letter].width = min(max(w + 2, 10), 48)
-        ws.freeze_panes = "A2"; return ws
-
+        ws.freeze_panes = "A2"
     ws = wb.active; ws.title = "Tong hop"
-    ws["A1"] = "DOI CHIEU DON POS CHUYEN KHOAN vs TIEN VAO"; ws["A1"].font = Font(bold=True, size=13)
+    ws["A1"] = "DOI CHIEU DON CHUYEN KHOAN vs TIEN VAO"; ws["A1"].font = Font(bold=True, size=13)
     ws["A2"] = f"Ky: {r['start']} .. {r['end']}"
     ws.append([]); ws.append(["Nhom", "So don/GD", "So tien (d)"])
     for c in range(1, 4):
-        cell = ws.cell(4, c); cell.fill = hdr_fill; cell.font = hdr_font; cell.alignment = Alignment(horizontal="center")
+        cell = ws.cell(4, c); cell.fill = hf; cell.font = hfont; cell.alignment = Alignment(horizontal="center")
     for name, n, s in [
-        ("Don POS chuyen khoan", r["n_orders"], r["sum_orders"]),
-        ("Don POS tien mat", r["n_cash"], r["sum_cash"]),
-        ("Don POS PTTT khac", r["n_other"], r["sum_other"]),
+        ("Don chuyen khoan", r["n_orders"], r["sum_orders"]),
+        ("Don tien mat", r["n_cash"], r["sum_cash"]),
+        ("Don PTTT khac", r["n_other"], r["sum_other"]),
         ("Tien vao (Sao ke 'in')", r["n_txn_in"], r["sum_txn_in"]),
         ("KHOP", r["n_matched"], r["sum_matched"]),
         ("Don CK khong thay tien vao", r["n_order_no_txn"], r["sum_order_no_txn"]),
         ("Tien vao khong khop don", r["n_txn_no_order"], r["sum_txn_no_order"]),
     ]:
         ws.append([name, n, s])
-    for row in range(5, ws.max_row + 1):
-        ws.cell(row, 3).number_format = money
+    for row in range(5, ws.max_row + 1): ws.cell(row, 3).number_format = money
     ws.column_dimensions["A"].width = 32; ws.column_dimensions["B"].width = 12; ws.column_dimensions["C"].width = 18
-
     _sheet("Khop", ["Ma don", "Ngay don", "Doanh thu don (d)", "So tien vao (d)", "Noi dung tien vao", "ID GD", "Khop theo"],
-           [[m["order"]["code"], m["order"]["date"], m["order"]["amount"], m["txn"]["amount"],
-             m["txn"]["content"], m["txn"]["id"], m["by"]] for m in r["matched"]], money_cols=(3, 4))
+           [[m["order"]["code"], m["order"]["date"], m["order"]["amount"], m["txn"]["amount"], m["txn"]["content"], m["txn"]["id"], m["by"]] for m in r["matched"]], mcols=(3, 4))
     _sheet("Don CK chua co tien vao", ["Ma don", "Ngay don", "Doanh thu don (d)", "PTTT"],
-           [[o["code"], o["date"], o["amount"], o.get("pay_txt", "")] for o in r["order_no_txn"]], money_cols=(3,))
+           [[o["code"], o["date"], o["amount"], o.get("pay_txt", "")] for o in r["order_no_txn"]], mcols=(3,))
     _sheet("Tien vao chua co don", ["Ngay", "So tien (d)", "Noi dung", "ID GD"],
-           [[x["date"], x["amount"], x["content"], x["id"]] for x in r["txn_no_order"]], money_cols=(2,))
+           [[x["date"], x["amount"], x["content"], x["id"]] for x in r["txn_no_order"]], mcols=(2,))
     _sheet("Don tien mat", ["Ma don", "Ngay don", "So tien (d)", "PTTT"],
-           [[o["code"], o["date"], o["amount"], o.get("pay_txt", "")] for o in r.get("cash_orders", [])], money_cols=(3,))
+           [[o["code"], o["date"], o["amount"], o.get("pay_txt", "")] for o in r.get("cash_orders", [])], mcols=(3,))
     wb.save(path); return path
 
 
-# ---------------- GUI LARK ----------------
-def _upload_file(token, path, fname):
-    import urllib.request, uuid, json as _j
-    HOST = getattr(C, "HOST", "https://open.larksuite.com")
-    boundary = "----recon" + uuid.uuid4().hex
-    with open(path, "rb") as f:
-        content = f.read()
-    parts = []
-    def _add(name, value):
-        parts.append(("--" + boundary).encode())
-        parts.append(f'Content-Disposition: form-data; name="{name}"'.encode()); parts.append(b"")
-        parts.append(str(value).encode())
-    _add("file_type", "stream"); _add("file_name", fname)
-    parts.append(("--" + boundary).encode())
-    parts.append(f'Content-Disposition: form-data; name="file"; filename="{fname}"'.encode())
-    parts.append(b"Content-Type: application/octet-stream"); parts.append(b""); parts.append(content)
-    parts.append(("--" + boundary + "--").encode()); parts.append(b"")
-    data = b"\r\n".join(parts)
-    req = urllib.request.Request(HOST + "/open-apis/im/v1/files", data=data, method="POST",
-        headers={"Authorization": "Bearer " + token, "Content-Type": "multipart/form-data; boundary=" + boundary})
-    d = _j.load(urllib.request.urlopen(req, timeout=60))
-    return d.get("data", {}).get("file_key"), d
-
-
 def notify(r, xlsx_path=None, chat_id=None):
-    import messaging as M, urllib.request, json as _j
-    t = L.token(); chat = chat_id or CONFIRM_CHAT; out = {"card": None, "file": None}
+    t = lark_token(); chat = chat_id or CONFIRM_CHAT; out = {"card": None, "file": None}
     try:
-        out["card"] = M.send_card(chat, build_card(r), t)
+        out["card"] = lark_send_card(t, chat, build_card(r)).get("code")
     except Exception as e:
-        out["card"] = {"err": str(e)}
+        out["card"] = "ERR " + str(e)
     if xlsx_path:
         try:
-            fk, _ = _upload_file(t, xlsx_path, os.path.basename(xlsx_path))
+            fk = lark_upload_file(t, xlsx_path, os.path.basename(xlsx_path))
             if fk:
-                HOST = getattr(C, "HOST", "https://open.larksuite.com")
-                body = {"receive_id": chat, "msg_type": "file", "content": _j.dumps({"file_key": fk})}
-                req = urllib.request.Request(HOST + "/open-apis/im/v1/messages?receive_id_type=chat_id",
-                    data=_j.dumps(body).encode(), method="POST",
-                    headers={"Authorization": "Bearer " + t, "Content-Type": "application/json"})
-                out["file"] = _j.load(urllib.request.urlopen(req, timeout=30))
+                out["file"] = lark_send_file(t, chat, fk).get("code")
         except Exception as e:
-            out["file"] = {"err": str(e)}
+            out["file"] = "ERR " + str(e)
     return out
 
 
@@ -297,9 +305,8 @@ if __name__ == "__main__":
         try:
             write_xlsx(r, xlsx); print("Excel:", xlsx)
         except Exception as e:
-            xlsx = None; print("Xuat Excel loi (can openpyxl):", e)
+            xlsx = None; print("Xuat Excel loi:", e)
         if do_notify:
-            res = notify(r, xlsx)
-            print("Lark:", json.dumps({k: (v.get("code") if isinstance(v, dict) else v) for k, v in res.items()}, ensure_ascii=False))
+            print("Lark:", json.dumps(notify(r, xlsx), ensure_ascii=False))
     slim = {k: v for k, v in r.items() if k not in ("matched", "order_no_txn", "txn_no_order", "cash_orders", "other_orders")}
     print(json.dumps(slim, ensure_ascii=False))
