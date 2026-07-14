@@ -24,6 +24,7 @@ jobs:
           LARK_APP_SECRET: ${{ secrets.LARK_APP_SECRET }}
           LARK_APP_TOKEN: ${{ secrets.LARK_APP_TOKEN }}
           LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK }}
+          ROT_WEBHOOK: ${{ secrets.ROT_WEBHOOK }}
           GOBOX_CLIENT_ID: ${{ secrets.GOBOX_CLIENT_ID }}
           GOBOX_CLIENT_SECRET: ${{ secrets.GOBOX_CLIENT_SECRET }}
           ROT_MODE: ${{ github.event.inputs.mode }}
