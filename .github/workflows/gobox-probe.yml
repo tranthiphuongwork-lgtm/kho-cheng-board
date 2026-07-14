@@ -1,5 +1,6 @@
 name: gobox-probe
 # Chay 1 lan de DO endpoint don hang + enum PTTT cua Gobox. Xem ket qua o tab log.
+# Credential Gobox/Lark da ghi san trong gobox.py/config.py -> chi can secret GOBOX_BASE.
 on:
   workflow_dispatch:
     inputs:
@@ -17,8 +18,6 @@ jobs:
       - name: Probe Gobox
         env:
           GOBOX_BASE: ${{ secrets.GOBOX_BASE }}
-          GOBOX_CLIENT_ID: ${{ secrets.GOBOX_CLIENT_ID }}
-          GOBOX_CLIENT_SECRET: ${{ secrets.GOBOX_CLIENT_SECRET }}
           GOBOX_ORDER_PLATFORM: "6"
         run: |
           python probe_run.py ${{ github.event.inputs.date }} | tee probe_output.txt
