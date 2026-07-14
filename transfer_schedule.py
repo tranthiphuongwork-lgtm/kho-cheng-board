@@ -157,6 +157,14 @@ def _up(s):
     import urllib.parse
     return urllib.parse.quote(s)
 
+# Email Lark của trưởng kho NHẬN (để tag). Thêm kho khác: {"Âu Cơ":"...","Mê Linh 2":"..."}
+try: KHO_MGR = {**{"Âu Cơ": "ngochai211202@gmail.com"}, **json.loads(os.getenv("KHO_MANAGERS", "{}"))}
+except Exception: KHO_MGR = {"Âu Cơ": "ngochai211202@gmail.com"}
+
+def _mgr_tag(kho):
+    e = KHO_MGR.get(kho)
+    return f'<at email="{e}"></at>' if e else f'@Trưởng kho {kho}'
+
 def card_stage1(state, ngay, confirm_url):
     """Thẻ tầng 1: mỗi KHO NHẬN 1 nút xác nhận."""
     dsts = []
@@ -168,8 +176,9 @@ def card_stage1(state, ngay, confirm_url):
         x = routes[f"{r['src']} → {r['dst']}"]; x[0] += 1; x[1] += r["qty"]
     lines = [f"• {k}: **{_vn(q)}** sp ({n} mã)" for k, (n, q) in
              sorted(routes.items(), key=lambda x: ROUTE_ORDER.index(x[0]) if x[0] in ROUTE_ORDER else 99)]
+    tags = "\n".join(f"{_mgr_tag(d)} — Cần xác nhận số lượng đề xuất chuyển kho" for d in dsts)
     body = f"**📦 ĐỀ XUẤT chuyển kho — {ngay}** · Tổng **{_vn(grand)}** sp\n" + "\n".join(lines) + \
-           "\n\n_Trưởng kho NHẬN kiểm tra & chỉnh số → gửi kho xuất duyệt._"
+           "\n\n" + tags
     acts = [{"tag": "button", "text": {"tag": "plain_text", "content": f"📥 Kho nhận {d} xác nhận"},
              "type": "primary", "url": f"{confirm_url}&role=nhan&kho={_up(d)}"} for d in dsts]
     return {"config": {"wide_screen_mode": True},
