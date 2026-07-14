@@ -29,7 +29,6 @@ jobs:
       - name: Run reconcile (xuat Excel + gui Lark)
         env:
           GOBOX_BASE: ${{ secrets.GOBOX_BASE }}
-          GOBOX_ORDER_PLATFORM: "6"
           RECON_NOTIFY: ${{ github.event.inputs.notify || '1' }}
         run: |
           python reconcile.py ${{ github.event.inputs.start }} ${{ github.event.inputs.end }}
