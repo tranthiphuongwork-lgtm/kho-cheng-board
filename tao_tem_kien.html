@@ -41,7 +41,7 @@
   .sku{text-align:center;font-size:10pt;margin-top:1.5mm}
   .name{text-align:center;font-weight:700;font-size:18pt;line-height:1.15;margin-top:2mm}
   .name.sm{font-size:15pt}
-  .nameEn{text-align:center;font-size:12pt;font-weight:600;color:#333;margin-top:1mm;line-height:1.1}
+  .nameEn{text-align:center;font-size:13pt;font-weight:600;color:#333;margin-top:1.5mm;line-height:1.15}
   .qc{text-align:center;font-size:15pt;margin-top:3mm}
   .dt{text-align:center;font-size:14pt;margin-top:2mm}
   .gc{text-align:center;font-size:15pt;font-weight:700;margin-top:3mm;color:#000}
@@ -165,7 +165,7 @@ function genTem(){
     for(var k=1;k<=it.sl;k++){
       if(onPage===4) newPage();
       g++;
-      var longName=it.ten.replace(/ - /g,' ').length>26;
+      var longName=(it.en||it.ten).replace(/ - /g,' ').length>20;
       var tem=document.createElement('div'); tem.className='tem';
       tem.innerHTML=
         '<div class="frame">'+
@@ -173,8 +173,8 @@ function genTem(){
           '<hr class="divider">'+
           '<div class="qrwrap"><div class="qr"></div></div>'+
           '<div class="sku">SKU: '+esc(it.s||it.g)+'</div>'+
-          '<div class="name'+(longName?' sm':'')+'">'+nameHtml(it.ten)+'</div>'+
-          (it.en?('<div class="nameEn">'+esc(it.en)+'</div>'):'')+
+          '<div class="name'+(longName?' sm':'')+'">'+(it.en?esc(it.en):nameHtml(it.ten))+'</div>'+
+          (it.en?('<div class="nameEn">'+nameHtml(it.ten)+'</div>'):'')+
           '<div class="qc">'+esc(it.qc||'')+'</div>'+
           (it.dt?('<div class="dt">Dung tích: '+esc(it.dt)+'</div>'):'')+
           (it.gc?('<div class="gc">Ghi chú: '+esc(it.gc)+'</div>'):'')+
