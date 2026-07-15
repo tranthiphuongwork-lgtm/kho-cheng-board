@@ -3,7 +3,9 @@ name: reconcile-transfer-vs-bank
 # Credential Gobox/Lark da ghi san trong gobox.py/config.py -> chi can secret GOBOX_BASE.
 on:
   schedule:
-    - cron: "0 1 * * *"   # 08:00 gio VN moi ngay (UTC+7)
+    - cron: "30 4 * * *"    # 11:30 gio VN (UTC+7)
+    - cron: "30 7 * * *"    # 14:30 gio VN
+    - cron: "30 14 * * *"   # 21:30 gio VN
   workflow_dispatch:
     inputs:
       start:
