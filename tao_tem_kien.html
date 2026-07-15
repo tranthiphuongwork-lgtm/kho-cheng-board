@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tạo tem kiện — Cheng</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f4f6fb;color:#1f2933;margin:0;padding:18px;max-width:1000px;margin:0 auto}
+  h1{font-size:20px;color:#1F4E78;margin:0 0 4px}
+  .sub{color:#667085;font-size:13px;margin-bottom:14px}
+  .cfg{display:flex;flex-wrap:wrap;gap:10px;background:#fff;padding:12px;border-radius:10px;margin-bottom:12px;box-shadow:0 1px 4px rgba(16,24,40,.06)}
+  .cfg label{font-size:12px;color:#475467;display:flex;flex-direction:column;gap:3px}
+  .cfg input{padding:8px;border:1px solid #cbd2dd;border-radius:8px;font-size:14px;min-width:150px}
+  table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(16,24,40,.06)}
+  th{background:#2E75B6;color:#fff;font-size:12px;padding:9px 8px;text-align:left}
+  td{border-bottom:1px solid #eef0f4;padding:6px 8px;vertical-align:middle}
+  td input{width:100%;padding:7px;border:1px solid #cbd2dd;border-radius:7px;font-size:14px}
+  td.num input{text-align:right}
+  td .ma{font-size:11px;color:#98a2b3;margin-top:3px;min-height:13px}
+  td .ma.bad{color:#c0392b}
+  .del{background:#fdecea;color:#c0392b;border:0;border-radius:7px;padding:7px 10px;cursor:pointer;font-weight:700}
+  .bar{margin:12px 0;display:flex;gap:10px;flex-wrap:wrap}
+  .btn{border:0;border-radius:9px;padding:11px 18px;font-size:15px;font-weight:700;cursor:pointer}
+  .add{background:#eaf1fb;color:#1F4E78}
+  .gen{background:#138d75;color:#fff}
+  .hint{color:#98a2b3;font-size:12px;margin-top:6px}
+
+  #print{display:none}
+  .tem{width:105mm;height:148mm;padding:7mm;page-break-after:always;background:#fff}
+  .frame{width:100%;height:100%;border:1.4px solid #000;padding:6mm 5mm;display:flex;flex-direction:column;position:relative}
+  .top{display:flex;justify-content:space-between;align-items:flex-end}
+  .route{font-weight:700;font-size:12pt}
+  .thung{font-weight:700;font-size:16pt}
+  .divider{border:0;border-top:.8px solid #000;margin:3mm 2mm 0}
+  .qrwrap{display:flex;justify-content:center;margin-top:3mm}
+  .qrwrap img,.qrwrap canvas{width:40mm !important;height:40mm !important}
+  .sku{text-align:center;font-size:10pt;margin-top:1.5mm}
+  .name{text-align:center;font-weight:700;font-size:18pt;line-height:1.15;margin-top:2mm}
+  .name.sm{font-size:15pt}
+  .qc{text-align:center;font-size:15pt;margin-top:3mm}
+  .hsd{font-weight:700;font-size:16pt;margin-top:7mm;display:flex;align-items:flex-end;gap:2mm}
+  .hsd .line{flex:1;border-bottom:1px solid #000;min-height:1px;margin-bottom:1.5mm}
+  .kien{position:absolute;right:5mm;bottom:3mm;font-size:9pt;color:#8a8f98}
+
+  @media print{
+    body{background:#fff;padding:0;max-width:none}
+    .noprint{display:none !important}
+    #print{display:block}
+    @page{size:105mm 148mm;margin:0}
+  }
+</style>
+</head>
+<body>
+
+<div class="noprint">
+  <h1>🏷️ Tạo tem kiện — Cheng</h1>
+  <div class="sub">Chọn tên sản phẩm trong danh mục (mã QR tự lấy). Nhập Quy cách, HSD, Số thùng → bấm “Tạo tem &amp; In”. Khổ A6 (105×148mm), mỗi thùng 1 tem.</div>
+
+  <div class="cfg">
+    <label>Kho xuất<input id="src" value="Sài Gòn"></label>
+    <label>Kho nhập<input id="dst" value="Hà Nội"></label>
+  </div>
+
+  <datalist id="prods"></datalist>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:34%">Tên sản phẩm (chọn trong danh mục)</th>
+        <th style="width:22%">Quy cách</th>
+        <th style="width:20%">HSD</th>
+        <th style="width:14%">Số thùng</th>
+        <th style="width:8%"></th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+  <div class="bar">
+    <button class="btn add" onclick="addRow()">➕ Thêm dòng</button>
+    <button class="btn gen" onclick="genTem()">🖨️ Tạo tem &amp; In</button>
+  </div>
+  <div class="hint">Gõ vài chữ trong ô Tên để lọc danh mục rồi chọn. Nếu tên đúng danh mục sẽ hiện “Mã: …” màu xám; nếu đỏ là chưa khớp danh mục.</div>
+</div>
+
+<div id="print"></div>
+
+<script>
+var CATALOG = [{"t": "Combo siêu dưỡng (hộp)", "g": "1082897", "s": "sd", "qc": "50 hộp/thùng"}, {"t": "Dầu gội tím 100ml (lọ)", "g": "1082736", "s": "kv100ml", "qc": "50 lọ/thùng"}, {"t": "Dầu gội tím 20ml (lọ)", "g": "1082729", "s": "kv20ml", "qc": "100 lọ/thùng"}, {"t": "Dầu gội tím 50ml (lọ)", "g": "1082732", "s": "kv50ml", "qc": "50 lọ/thùng"}, {"t": "Hũ ủ hồng ziemlich (hộp)", "g": "1082752", "s": "huhong", "qc": "45 hộp/thùng"}, {"t": "Hũ ủ tím ziemlich (hộp)", "g": "1082757", "s": "hutim", "qc": "88 hộp/thùng"}, {"t": "Kem chống rát (lọ)", "g": "1082783", "s": "kcr", "qc": "50 lọ/thùng"}, {"t": "Keratin ziemlich (lọ)", "g": "1082767", "s": "krt", "qc": "100 lọ/thùng"}, {"t": "Khoá màu ziemlich (lọ)", "g": "1082773", "s": "km", "qc": "50 lọ/thùng"}, {"t": "Nâng mạnh ziemlich (hộp)", "g": "1082820", "s": "nm", "qc": "50 hộp/thùng"}, {"t": "Nâng nhẹ ziemlich (hộp)", "g": "1082825", "s": "nn", "qc": "50 hộp/thùng"}, {"t": "Nước Hoa Blue Shirt - 10ML (lọ)", "g": "1088305", "s": "z10ml", "qc": ""}, {"t": "Nước Hoa Blue Shirt - 2ML (lọ)", "g": "1088276", "s": "z2ml", "qc": ""}, {"t": "Nước Hoa Blue Shirt - 30ML (lọ)", "g": "1088323", "s": "z30ml", "qc": ""}, {"t": "Nước Hoa DARK BEAUTY - 10ML (lọ)", "g": "1088291", "s": "db10ml", "qc": ""}, {"t": "Nước Hoa DARK BEAUTY - 2ML (lọ)", "g": "1088258", "s": "db2ml", "qc": ""}, {"t": "Nước Hoa DARK BEAUTY - 30ML (lọ)", "g": "1088313", "s": "db30ml", "qc": ""}, {"t": "Nước Hoa FIRST LOVE - 10ML (lọ)", "g": "1088300", "s": "fl10ml", "qc": ""}, {"t": "Nước Hoa FIRST LOVE - 2ML (lọ)", "g": "1088267", "s": "fl2ml", "qc": ""}, {"t": "Nước Hoa FIRST LOVE - 30ML (lọ)", "g": "1088318", "s": "fl30ml", "qc": ""}, {"t": "Nước Hoa GIRL POWER - 10ML (lọ)", "g": "1088301", "s": "gp10ml", "qc": ""}, {"t": "Nước Hoa GIRL POWER - 2ML (lọ)", "g": "1088269", "s": "gp2ml", "qc": ""}, {"t": "Nước Hoa GIRL POWER - 30ML (lọ)", "g": "1088319", "s": "gp30ml", "qc": ""}, {"t": "Nước Hoa JASMINE AMBER - 10ML (lọ)", "g": "1088289", "s": "ja10ml", "qc": ""}, {"t": "Nước Hoa JASMINE AMBER - 2ML (lọ)", "g": "1088256", "s": "ja2ml", "qc": ""}, {"t": "Nước Hoa JASMINE AMBER - 30ML (lọ)", "g": "1088312", "s": "ja30ml", "qc": ""}, {"t": "Nước Hoa LADYKILLER - 10ML (lọ)", "g": "1088295", "s": "lk10ml", "qc": ""}, {"t": "Nước Hoa LADYKILLER - 2ML (lọ)", "g": "1088261", "s": "lk2ml", "qc": ""}, {"t": "Nước Hoa LADYKILLER - 30ML (lọ)", "g": "1088315", "s": "lk30ml", "qc": ""}, {"t": "Nước Hoa VENUS - 10ML (lọ)", "g": "1088297", "s": "vn10ml", "qc": ""}, {"t": "Nước Hoa VENUS - 2ML (lọ)", "g": "1088263", "s": "vn2ml", "qc": ""}, {"t": "Nước Hoa VENUS - 30ML (lọ)", "g": "1088316", "s": "vn30ml", "qc": ""}, {"t": "Protein phục hồi hư tổn (lọ)", "g": "1082779", "s": "protein", "qc": "100 lọ/thùng"}, {"t": "Sữa tắm Dark Beauty (chai)", "g": "1088268", "s": "stdb", "qc": ""}, {"t": "Sữa tắm First Love (chai)", "g": "1088275", "s": "stfl", "qc": ""}, {"t": "Sữa tắm Girl Power (chai)", "g": "1088273", "s": "stgp", "qc": ""}, {"t": "Sữa tắm Jasmine Amber (chai)", "g": "1088277", "s": "stja", "qc": ""}, {"t": "Sữa tắm Venus (chai)", "g": "1088270", "s": "stvn", "qc": ""}, {"t": "Tinh dầu 100ml (lọ)", "g": "1082748", "s": "td100ml", "qc": "100 lọ/thùng"}, {"t": "Tinh dầu 10ml (lọ)", "g": "1082740", "s": "td10ml", "qc": "100 lọ/thùng"}, {"t": "Tinh dầu 30ml (lọ)", "g": "1082745", "s": "td30ml", "qc": ""}, {"t": "Trợ oxy 12% (lọ)", "g": "1082724", "s": "0.12", "qc": "168 lọ/thùng"}, {"t": "Trợ oxy 3% (lọ)", "g": "1082708", "s": "0.03", "qc": "168 lọ/thùng"}, {"t": "Trợ oxy 6% (lọ)", "g": "1082714", "s": "0.06", "qc": "168 lọ/thùng"}, {"t": "Trợ oxy 9% (lọ)", "g": "1082718", "s": "0.09", "qc": "168 lọ/thùng"}, {"t": "Tẩy ziemlich bé (hộp)", "g": "1082798", "s": "tb", "qc": "50 hộp/thùng"}, {"t": "Tẩy ziemlich to (hộp)", "g": "1082803", "s": "tt", "qc": "104 hộp/thùng"}, {"t": "Xịt dưỡng tóc 100ml (lọ)", "g": "1082793", "s": "xit100ml", "qc": "50 lọ/thùng"}, {"t": "Xịt dưỡng tóc 30ml (lọ)", "g": "1082788", "s": "xit30ml", "qc": "50 lọ/thùng"}, {"t": "Ủ ziemlich hồng (gói)", "g": "1082694", "s": "uhong", "qc": "600 gói/thùng"}, {"t": "Ủ ziemlich tím (gói)", "g": "1082699", "s": "utim", "qc": "600 gói/thùng"}];
+function norm(s){return (s||'').replace(/\s+/g,' ').trim().toLowerCase();}
+var MAP = {};
+CATALOG.forEach(function(c){ MAP[norm(c.t)] = c; });
+
+// datalist
+(function(){
+  var dl = document.getElementById('prods');
+  var frag = document.createDocumentFragment();
+  CATALOG.forEach(function(c){ var o=document.createElement('option'); o.value=c.t; frag.appendChild(o); });
+  dl.appendChild(frag);
+})();
+
+function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function nameHtml(ten){ return ten.split(' - ').map(function(p,i){return esc((i>0?'- ':'')+p.trim());}).join('<br>'); }
+
+function onTen(inp){
+  var tr=inp.closest('tr'); var m=MAP[norm(inp.value)]; var lbl=tr.querySelector('.ma');
+  if(m){ lbl.textContent='Mã QR: '+(m.g||m.s||'(trống)'); lbl.classList.remove('bad'); tr.dataset.g=m.g||''; tr.dataset.s=m.s||'';
+         var qcin=tr.querySelector('.c-qc'); if(m.qc) qcin.value=m.qc; }
+  else { lbl.textContent = inp.value? 'Chưa khớp danh mục':''; lbl.classList.add('bad'); tr.dataset.g=''; tr.dataset.s=''; }
+}
+
+function addRow(v){
+  v=v||{};
+  var tr=document.createElement('tr');
+  tr.innerHTML=
+    '<td><input class="c-ten" list="prods" placeholder="Gõ để tìm..." value="'+(v.ten||'')+'" oninput="onTen(this)"><div class="ma"></div></td>'+
+    '<td><input class="c-qc" placeholder="Vd: 45 hộp/thùng" value="'+(v.qc||'')+'"></td>'+
+    '<td><input type="date" class="c-hsd" value="'+(v.hsd||'')+'"></td>'+
+    '<td class="num"><input class="c-sl" type="number" min="1" step="1" value="'+(v.sl||1)+'"></td>'+
+    '<td style="text-align:center"><button class="del" onclick="this.closest(\'tr\').remove()">✕</button></td>';
+  document.getElementById('rows').appendChild(tr);
+  if(v.ten) onTen(tr.querySelector('.c-ten'));
+}
+
+function fmtHSD(v){
+  var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(v||'');
+  return m ? (m[3]+'/'+m[2]+'/'+m[1]) : (v||'');
+}
+function genTem(){
+  var src=document.getElementById('src').value.trim(), dst=document.getElementById('dst').value.trim();
+  var route=(src&&dst)?(src+' → '+dst):(src||dst||'');
+  var trs=document.querySelectorAll('#rows tr'); var items=[]; var bad=[];
+  trs.forEach(function(tr){
+    var ten=tr.querySelector('.c-ten').value.trim();
+    var qc=tr.querySelector('.c-qc').value.trim();
+    var hsd=tr.querySelector('.c-hsd').value.trim();
+    var sl=parseInt(tr.querySelector('.c-sl').value,10)||0;
+    if(!ten||sl<=0) return;
+    var m=MAP[norm(ten)];
+    if(!m){ bad.push(ten); return; }
+    items.push({ten:m.t, g:m.g, s:m.s, qc:qc, hsd:hsd, sl:sl});
+  });
+  if(bad.length){ if(!confirm('Các mã CHƯA khớp danh mục (sẽ bỏ qua):\n- '+bad.join('\n- ')+'\n\nTiếp tục in phần còn lại?')) return; }
+  if(items.length===0){ alert('Chưa có dòng hợp lệ (Tên phải chọn trong danh mục, Số thùng ≥ 1).'); return; }
+
+  var M=items.reduce(function(a,b){return a+b.sl;},0);
+  var out=document.getElementById('print'); out.innerHTML=''; var g=0;
+  items.forEach(function(it){
+    for(var k=1;k<=it.sl;k++){
+      g++;
+      var longName=it.ten.replace(/ - /g,' ').length>26;
+      var tem=document.createElement('div'); tem.className='tem';
+      tem.innerHTML=
+        '<div class="frame">'+
+          '<div class="top"><span class="route">'+esc(route)+'</span><span class="thung">Thùng '+k+'/'+it.sl+'</span></div>'+
+          '<hr class="divider">'+
+          '<div class="qrwrap"><div class="qr"></div></div>'+
+          '<div class="sku">SKU: '+esc(it.s||it.g)+'</div>'+
+          '<div class="name'+(longName?' sm':'')+'">'+nameHtml(it.ten)+'</div>'+
+          '<div class="qc">Quy cách: '+esc(it.qc||'—')+'</div>'+
+          '<div class="hsd">HSD:'+(it.hsd?(' '+esc(fmtHSD(it.hsd))):'<span class="line"></span>')+'</div>'+
+          '<div class="kien">Kiện '+g+'/'+M+'</div>'+
+        '</div>';
+      out.appendChild(tem);
+      new QRCode(tem.querySelector('.qr'), {text:(it.g||it.s||it.ten), width:160, height:160, correctLevel:QRCode.CorrectLevel.M});
+    }
+  });
+  setTimeout(function(){ window.print(); }, 350);
+}
+
+addRow({ten:'Hũ ủ hồng ziemlich (hộp)',qc:'45 hộp/thùng',sl:5});
+addRow();
+</script>
+</body>
+</html>
