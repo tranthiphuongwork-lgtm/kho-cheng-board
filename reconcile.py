@@ -32,6 +32,7 @@ IN_VALUE     = os.getenv("SAOKE_IN_VALUE", "in")
 TOLERANCE    = int(os.getenv("RECON_TOLERANCE", "0"))
 IGFB_TOL     = int(os.getenv("RECON_IGFB_TOLERANCE", "999"))   # don ghi chu "igfb": cho lech < 1000d
 CARD_MAX     = int(os.getenv("RECON_CARD_MAX", "20"))
+UNVERIFIED_NOTE = os.getenv("RECON_UNVERIFIED_NOTE", "chưa nhận được tiền")
 NOTIFY_DEFAULT = os.getenv("RECON_NOTIFY", "1") == "1"
 
 
@@ -222,7 +223,7 @@ def build_card(r):
         shown = lines[:CARD_MAX]
         more = f"\n_… và {len(lines) - CARD_MAX} dòng khác (xem Excel)_" if len(lines) > CARD_MAX else ""
         return header + ("\n" + "\n".join(shown) if shown else "") + more
-    ord_lines = [f"• `{o['code'] or '(không mã)'}` — **{_fmt(o['amount'])} d**  _{o.get('date','')}_" for o in r["order_no_txn"]]
+    ord_lines = [f"• `{o['code'] or '(không mã)'}` — **{_fmt(o['amount'])} d**  _{o.get('date','')}_  ⚠️ {UNVERIFIED_NOTE}" for o in r["order_no_txn"]]
     txn_lines = [f"• **{_fmt(x['amount'])} d** — {(x['content'] or '')[:40]}  _{x.get('date','')}_" for x in r["txn_no_order"]]
     blk_ord = _blk(f"⚠️ **Don CK chua thay tien vao: {r['n_order_no_txn']} · {_fmt(r['sum_order_no_txn'])} d**", ord_lines)
     blk_txn = _blk(f"❔ **Tien vao chua khop don: {r['n_txn_no_order']} · {_fmt(r['sum_txn_no_order'])} d**", txn_lines)
@@ -274,8 +275,8 @@ def write_xlsx(r, path):
     ws.column_dimensions["A"].width = 32; ws.column_dimensions["B"].width = 12; ws.column_dimensions["C"].width = 18
     _sheet("Khop", ["Ma don", "Ngay don", "Doanh thu don (d)", "So tien vao (d)", "Noi dung tien vao", "ID GD", "Khop theo"],
            [[m["order"]["code"], m["order"]["date"], m["order"]["amount"], m["txn"]["amount"], m["txn"]["content"], m["txn"]["id"], m["by"]] for m in r["matched"]], mcols=(3, 4))
-    _sheet("Don CK chua co tien vao", ["Ma don", "Ngay don", "Doanh thu don (d)", "PTTT"],
-           [[o["code"], o["date"], o["amount"], o.get("pay_txt", "")] for o in r["order_no_txn"]], mcols=(3,))
+    _sheet("Don CK chua co tien vao", ["Ma don", "Ngay don", "Doanh thu don (d)", "PTTT", "Ghi chu"],
+           [[o["code"], o["date"], o["amount"], o.get("pay_txt", ""), UNVERIFIED_NOTE] for o in r["order_no_txn"]], mcols=(3,))
     _sheet("Tien vao chua co don", ["Ngay", "So tien (d)", "Noi dung", "ID GD"],
            [[x["date"], x["amount"], x["content"], x["id"]] for x in r["txn_no_order"]], mcols=(2,))
     _sheet("Don tien mat", ["Ma don", "Ngay don", "So tien (d)", "PTTT"],
