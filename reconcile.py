@@ -30,6 +30,7 @@ F_SK_DATE    = os.getenv("SAOKE_DATE_FIELD", "Ngày giao dịch")
 F_SK_ID      = os.getenv("SAOKE_ID_FIELD", "ID")
 IN_VALUE     = os.getenv("SAOKE_IN_VALUE", "in")
 TOLERANCE    = int(os.getenv("RECON_TOLERANCE", "0"))
+IGFB_TOL     = int(os.getenv("RECON_IGFB_TOLERANCE", "999"))   # don ghi chu "igfb": cho lech < 1000d
 CARD_MAX     = int(os.getenv("RECON_CARD_MAX", "20"))
 NOTIFY_DEFAULT = os.getenv("RECON_NOTIFY", "1") == "1"
 
@@ -136,14 +137,17 @@ def reconcile(orders, txns):
 
     def _by_amount(o):
         cands = o.get("amounts") or ([o["amount"]] if o.get("amount") else [])
-        best = None
+        tol = IGFB_TOL if o.get("igfb") else TOLERANCE
+        best, bestkey = None, None
         for x in txns:
             if x["_used"]:
                 continue
-            if not any(abs(x["amount"] - c) <= TOLERANCE for c in cands):
+            diff = min(abs(x["amount"] - c) for c in cands)
+            if diff > tol:
                 continue
-            if best is None or (x["date"] == o["date"] and best["date"] != o["date"]):
-                best = x
+            key = (diff, 0 if x["date"] == o["date"] else 1)  # gan nhat, uu tien cung ngay
+            if best is None or key < bestkey:
+                best, bestkey = x, key
         return best
 
     for o in orders:
@@ -155,7 +159,10 @@ def reconcile(orders, txns):
             continue
         x = _by_amount(o)
         if x:
-            x["_used"] = True; matched.append({"order": o, "txn": x, "by": "amount"})
+            cands = o.get("amounts") or [o.get("amount")]
+            diff = min(abs(x["amount"] - c) for c in cands if c is not None)
+            x["_used"] = True
+            matched.append({"order": o, "txn": x, "by": ("amount" if diff == 0 else f"igfb±{int(diff)}")})
         else:
             order_no_txn.append(o)
     txn_no_order = [x for x in txns if not x["_used"]]
