@@ -158,8 +158,9 @@ def _up(s):
     return urllib.parse.quote(s)
 
 # Email Lark của trưởng kho NHẬN (để tag). Thêm kho khác: {"Âu Cơ":"...","Mê Linh 2":"..."}
-try: KHO_MGR = {**{"Âu Cơ": "ngochai211202@gmail.com"}, **json.loads(os.getenv("KHO_MANAGERS", "{}"))}
-except Exception: KHO_MGR = {"Âu Cơ": "ngochai211202@gmail.com"}
+_DEF_MGR = {"Âu Cơ": "ngochai211202@gmail.com", "Mê Linh 1": "tuanhung1143@gmail.com", "Mê Linh 2": "tuanhung1143@gmail.com"}
+try: KHO_MGR = {**_DEF_MGR, **json.loads(os.getenv("KHO_MANAGERS", "{}"))}
+except Exception: KHO_MGR = _DEF_MGR
 
 def _mgr_tag(kho):
     e = KHO_MGR.get(kho)
@@ -186,9 +187,22 @@ def card_stage1(state, ngay, confirm_url):
             "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": body}},
                          {"tag": "action", "actions": acts}]}
 
+def card_remind(transfers, ngay):
+    """Thẻ NHẮC chuyển hàng (17 & 27) — không có nút duyệt."""
+    srcs = []
+    for t in transfers:
+        if t["src"] not in srcs: srcs.append(t["src"])
+    tags = " · ".join(dict.fromkeys(_mgr_tag(s) for s in srcs))
+    body = (f"**🔔 NHẮC CHUYỂN KHO — {ngay}**\n"
+            "Hôm nay chuyển hàng theo phiếu đã duyệt (ngày 15/25). "
+            "Kho xuất soạn & giao hàng, kho nhận nhận hàng theo tem/phiếu.\n" + tags)
+    return {"config": {"wide_screen_mode": True},
+            "header": {"template": "turquoise", "title": {"tag": "plain_text", "content": "🔔 Nhắc chuyển kho"}},
+            "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": body}}]}
+
 def main():
     now = datetime.datetime.now(VN); day = now.day
-    mode = os.getenv("ROT_MODE") or ({15: 'prep', 25: 'prep', 17: 'transfer', 27: 'transfer'}.get(day))
+    mode = os.getenv("ROT_MODE") or ({15: 'transfer', 25: 'transfer', 17: 'remind', 27: 'remind'}.get(day))
     if not mode:
         print(f"Hôm nay ngày {day} không phải 15/17/25/27 -> bỏ qua."); return
     tok = M.ltoken()
@@ -201,9 +215,9 @@ def main():
         _bot_state_set(tok, "transfer_state", json.dumps(state, ensure_ascii=False))
         send(card_stage1(state, ngay, CONFIRM_URL))
         print(f"Đã lưu state 2 tầng + gửi thẻ kho nhận: {len(transfers)} dòng.")
-    else:  # prep: chỉ báo trước để Mê Linh soạn hàng (không có nút duyệt)
-        send(build_card(transfers, mode, ngay, CONFIRM_URL))
-        print(f"Đã gửi thẻ chuẩn bị: {len(transfers)} dòng.")
+    else:  # remind (17 & 27): chỉ nhắc chuyển hàng, không duyệt lại
+        send(card_remind(transfers, ngay))
+        print(f"Đã gửi thẻ NHẮC chuyển kho: {len(transfers)} dòng.")
 
 if __name__ == '__main__':
     main()
