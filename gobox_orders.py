@@ -50,6 +50,9 @@ F_PLATF   = [s for s in os.getenv("GOBOX_ORDER_PLATFORM_FIELD","platform").split
 F_PLATFNAME = ["platform_name"]
 # Chi doi chieu don POS (platform_name chua "pos"). De trong = khong loc.
 POS_ONLY = [s.strip() for s in os.getenv("GOBOX_ORDER_PLATFORMS", "pos").split(",") if s.strip()]
+# Loai don theo trang thai (khop status_txt khong dau, contains). Mac dinh: don huy.
+F_STATUS = ["status_txt"]
+EXCLUDE_STATUS = [s.strip() for s in os.getenv("GOBOX_ORDER_EXCLUDE_STATUS", "huy").split(",") if s.strip()]
 # Truong ghi chu (de bat "igfb"...). Quet ca cac truong nay + toan bo raw cho chac.
 F_NOTE = [s for s in os.getenv("GOBOX_ORDER_NOTE_FIELD", "internal_notes,note,notes,message_to_seller,remark,description,comment,memo,ghi_chu,customer_note,seller_note,order_note").split(",") if s]
 # So tien THUC TRA (uu tien khop) va cac thanh phan de suy ra net = subtotal - discount
@@ -286,6 +289,7 @@ def normalize(row):
         "date": _date10(dt),
         "platform": plat,
         "platform_name": (_first(o, F_PLATFNAME)[0] if F_PLATFNAME else None),
+        "status_txt": (_first(o, F_STATUS)[0] if F_STATUS else None),
         "note": " ".join(str(_first(o, [k])[0] or "") for k in F_NOTE).strip(),
         "igfb": _has_igfb(o),
         "raw": o,
@@ -392,6 +396,10 @@ def classify(start_date, end_date):
         if POS_ONLY:
             pn = _no_accent(n.get("platform_name"))
             if not any(x in pn for x in POS_ONLY):
+                continue
+        if EXCLUDE_STATUS:
+            st = _no_accent(n.get("status_txt"))
+            if any(x in st for x in EXCLUDE_STATUS):
                 continue
         g["all"].append(n)
         if is_transfer(n):
