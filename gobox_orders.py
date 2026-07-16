@@ -19,7 +19,7 @@ Chay /open/api/sys/helpers de lay enum that -> dien GOBOX_TRANSFER_CODE cho chac
 
 Moi cau hinh deu override bang env, KHONG can sua code.
 """
-import os, time, json, unicodedata, urllib.request, urllib.parse
+import os, re, time, json, unicodedata, urllib.request, urllib.parse
 import gobox as GB   # tai su dung get_token() + BASE + _open() da chay that
 
 # ---- Endpoint & tham so ----
@@ -51,7 +51,7 @@ F_PLATFNAME = ["platform_name"]
 # Chi doi chieu don POS (platform_name chua "pos"). De trong = khong loc.
 POS_ONLY = [s.strip() for s in os.getenv("GOBOX_ORDER_PLATFORMS", "pos").split(",") if s.strip()]
 # Truong ghi chu (de bat "igfb"...). Quet ca cac truong nay + toan bo raw cho chac.
-F_NOTE = [s for s in os.getenv("GOBOX_ORDER_NOTE_FIELD", "internal_notes,message_to_seller,note,notes,remark,description").split(",") if s]
+F_NOTE = [s for s in os.getenv("GOBOX_ORDER_NOTE_FIELD", "internal_notes,note,notes,message_to_seller,remark,description,comment,memo,ghi_chu,customer_note,seller_note,order_note").split(",") if s]
 # So tien THUC TRA (uu tien khop) va cac thanh phan de suy ra net = subtotal - discount
 F_PAID     = [s for s in os.getenv("GOBOX_ORDER_PAID_FIELD",     "total_amount,total_paid,paid_amount,final_amount,grand_total,payment_amount,transfer_amount").split(",") if s]
 F_SUBTOTAL = [s for s in os.getenv("GOBOX_ORDER_SUBTOTAL_FIELD", "subtotal,sub_total,items_total,total_price,goods_amount,order_amount").split(",") if s]
@@ -75,6 +75,17 @@ def _no_accent(s):
     s = (s or "").replace("đ", "d").replace("Đ", "d")
     s = unicodedata.normalize("NFD", s)
     return "".join(c for c in s if unicodedata.category(c) != "Mn").strip().lower()
+
+
+IGFB_RE = re.compile(r"ig[\s/_.,\-]*fb")   # bat: igfb, ig fb, ig/fb, ig-fb...
+
+def _has_igfb(obj):
+    """True neu ghi chu don co 'ig fb'/'igfb' (moi bien the dau cach/gach)."""
+    try:
+        t = _no_accent(json.dumps(obj, ensure_ascii=False))
+    except Exception:
+        t = _no_accent(str(obj))
+    return bool(IGFB_RE.search(t))
 
 
 def _first(d, keys):
@@ -276,7 +287,7 @@ def normalize(row):
         "platform": plat,
         "platform_name": (_first(o, F_PLATFNAME)[0] if F_PLATFNAME else None),
         "note": " ".join(str(_first(o, [k])[0] or "") for k in F_NOTE).strip(),
-        "igfb": ("igfb" in json.dumps(o, ensure_ascii=False).lower()),
+        "igfb": _has_igfb(o),
         "raw": o,
     }
 
@@ -347,17 +358,20 @@ def enrich_igfb(orders):
     if err:
         return orders
     for o in orders:
-        if o.get("igfb"):
-            continue
         code = o.get("code")
         if not code:
             continue
         det = _get_obj(token, ORDERS_PATH.rstrip("/") + "/" + str(code))
-        if det and "igfb" in json.dumps(det, ensure_ascii=False).lower():
+        if not det:
+            time.sleep(0.1); continue
+        # ghi chu that cua don (Gobox): lay truong dau tien khong rong
+        for k in F_NOTE:
+            v = _first(det, [k])[0]
+            if v and str(v).strip():
+                o["note"] = str(v).strip(); break
+        # bat igfb (moi bien the)
+        if _has_igfb(det):
             o["igfb"] = True
-            note = " ".join(str(_first(det, [k])[0] or "") for k in F_NOTE).strip()
-            if note:
-                o["note"] = note
         time.sleep(0.12)
     return orders
 
