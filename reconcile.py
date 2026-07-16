@@ -223,7 +223,11 @@ def build_card(r):
         shown = lines[:CARD_MAX]
         more = f"\n_… và {len(lines) - CARD_MAX} dòng khác (xem Excel)_" if len(lines) > CARD_MAX else ""
         return header + ("\n" + "\n".join(shown) if shown else "") + more
-    ord_lines = [f"• `{o['code'] or '(không mã)'}` — **{_fmt(o['amount'])} d**  _{o.get('date','')}_  ⚠️ {UNVERIFIED_NOTE}" for o in r["order_no_txn"]]
+    def _oline(o):
+        base = f"• `{o['code'] or '(không mã)'}` — **{_fmt(o['amount'])} d**  _{o.get('date','')}_  ⚠️ {UNVERIFIED_NOTE}"
+        note = (o.get('note') or '').strip()
+        return base + (f"  · 📝 _{note}_" if note else "")
+    ord_lines = [_oline(o) for o in r["order_no_txn"]]
     txn_lines = [f"• **{_fmt(x['amount'])} d** — {(x['content'] or '')[:40]}  _{x.get('date','')}_" for x in r["txn_no_order"]]
     blk_ord = _blk(f"⚠️ **Don CK chua thay tien vao: {r['n_order_no_txn']} · {_fmt(r['sum_order_no_txn'])} d**", ord_lines)
     blk_txn = _blk(f"❔ **Tien vao chua khop don: {r['n_txn_no_order']} · {_fmt(r['sum_txn_no_order'])} d**", txn_lines)
@@ -275,8 +279,8 @@ def write_xlsx(r, path):
     ws.column_dimensions["A"].width = 32; ws.column_dimensions["B"].width = 12; ws.column_dimensions["C"].width = 18
     _sheet("Khop", ["Ma don", "Ngay don", "Doanh thu don (d)", "So tien vao (d)", "Noi dung tien vao", "ID GD", "Khop theo"],
            [[m["order"]["code"], m["order"]["date"], m["order"]["amount"], m["txn"]["amount"], m["txn"]["content"], m["txn"]["id"], m["by"]] for m in r["matched"]], mcols=(3, 4))
-    _sheet("Don CK chua co tien vao", ["Ma don", "Ngay don", "Doanh thu don (d)", "PTTT", "Ghi chu"],
-           [[o["code"], o["date"], o["amount"], o.get("pay_txt", ""), UNVERIFIED_NOTE] for o in r["order_no_txn"]], mcols=(3,))
+    _sheet("Don CK chua co tien vao", ["Ma don", "Ngay don", "Doanh thu don (d)", "PTTT", "Ghi chu Gobox", "Trang thai"],
+           [[o["code"], o["date"], o["amount"], o.get("pay_txt", ""), (o.get("note") or ""), UNVERIFIED_NOTE] for o in r["order_no_txn"]], mcols=(3,))
     _sheet("Tien vao chua co don", ["Ngay", "So tien (d)", "Noi dung", "ID GD"],
            [[x["date"], x["amount"], x["content"], x["id"]] for x in r["txn_no_order"]], mcols=(2,))
     _sheet("Don tien mat", ["Ma don", "Ngay don", "So tien (d)", "PTTT"],
