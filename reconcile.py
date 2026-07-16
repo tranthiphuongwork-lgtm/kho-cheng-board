@@ -196,15 +196,15 @@ def _fmt(n):
 
 def summary_text(r):
     if not r.get("ok"):
-        return "LOI (" + str(r.get("stage", "?")) + "): " + str(r.get("err"))
+        return "LỖI (" + str(r.get("stage", "?")) + "): " + str(r.get("err"))
     return "\n".join([
-        f"Doi chieu {r['start']}..{r['end']}",
-        f"- Don chuyen khoan: {r['n_orders']} · {_fmt(r['sum_orders'])} d",
-        f"- Don tien mat: {r['n_cash']} · {_fmt(r['sum_cash'])} d",
-        f"- Tien vao (Sao ke 'in'): {r['n_txn_in']} · {_fmt(r['sum_txn_in'])} d",
-        f"- KHOP: {r['n_matched']} · {_fmt(r['sum_matched'])} d",
-        f"- Don CK chua thay tien vao: {r['n_order_no_txn']} · {_fmt(r['sum_order_no_txn'])} d",
-        f"- Tien vao chua khop don: {r['n_txn_no_order']} · {_fmt(r['sum_txn_no_order'])} d",
+        f"Đối chiếu {r['start']}..{r['end']}",
+        f"- Đơn chuyển khoản: {r['n_orders']} · {_fmt(r['sum_orders'])} đ",
+        f"- Đơn tiền mặt: {r['n_cash']} · {_fmt(r['sum_cash'])} đ",
+        f"- Tiền vào (Sao kê 'in'): {r['n_txn_in']} · {_fmt(r['sum_txn_in'])} đ",
+        f"- KHỚP: {r['n_matched']} · {_fmt(r['sum_matched'])} đ",
+        f"- Đơn CK chưa thấy tiền vào: {r['n_order_no_txn']} · {_fmt(r['sum_order_no_txn'])} đ",
+        f"- Tiền vào chưa khớp đơn: {r['n_txn_no_order']} · {_fmt(r['sum_txn_no_order'])} đ",
     ])
 
 
@@ -212,25 +212,25 @@ def build_card(r):
     def _pct(a, b):
         return f" ({a/b*100:.0f}%)" if b else ""
     tmpl = "green" if r["n_order_no_txn"] == 0 else "orange"
-    title = f"📊 Doi chieu CK vs tien vao · {r['start']}" + (f"..{r['end']}" if r['end'] != r['start'] else "")
+    title = f"📊 Đối chiếu CK vs tiền vào · {r['start']}" + (f"..{r['end']}" if r['end'] != r['start'] else "")
     top = "\n".join([
-        f"**Don chuyen khoan:** {r['n_orders']} · {_fmt(r['sum_orders'])} d",
-        f"💵 **Don tien mat:** {r['n_cash']} · {_fmt(r['sum_cash'])} d",
-        f"**Tien vao (in):** {r['n_txn_in']} · {_fmt(r['sum_txn_in'])} d",
-        f"✅ **Khop:** {r['n_matched']}{_pct(r['n_matched'], r['n_orders'])} · {_fmt(r['sum_matched'])} d",
+        f"**Đơn chuyển khoản:** {r['n_orders']} · {_fmt(r['sum_orders'])} đ",
+        f"💵 **Đơn tiền mặt:** {r['n_cash']} · {_fmt(r['sum_cash'])} đ",
+        f"**Tiền vào (in):** {r['n_txn_in']} · {_fmt(r['sum_txn_in'])} đ",
+        f"✅ **Khớp:** {r['n_matched']}{_pct(r['n_matched'], r['n_orders'])} · {_fmt(r['sum_matched'])} đ",
     ])
     def _blk(header, lines):
         shown = lines[:CARD_MAX]
         more = f"\n_… và {len(lines) - CARD_MAX} dòng khác (xem Excel)_" if len(lines) > CARD_MAX else ""
         return header + ("\n" + "\n".join(shown) if shown else "") + more
     def _oline(o):
-        base = f"• `{o['code'] or '(không mã)'}` — **{_fmt(o['amount'])} d**  _{o.get('date','')}_  ⚠️ {UNVERIFIED_NOTE}"
+        base = f"• `{o['code'] or '(không mã)'}` — **{_fmt(o['amount'])} đ**  _{o.get('date','')}_"
         note = (o.get('note') or '').strip()
         return base + (f"  · 📝 _{note}_" if note else "")
     ord_lines = [_oline(o) for o in r["order_no_txn"]]
-    txn_lines = [f"• **{_fmt(x['amount'])} d** — {(x['content'] or '')[:40]}  _{x.get('date','')}_" for x in r["txn_no_order"]]
-    blk_ord = _blk(f"⚠️ **Don CK chua thay tien vao: {r['n_order_no_txn']} · {_fmt(r['sum_order_no_txn'])} d**", ord_lines)
-    blk_txn = _blk(f"❔ **Tien vao chua khop don: {r['n_txn_no_order']} · {_fmt(r['sum_txn_no_order'])} d**", txn_lines)
+    txn_lines = [f"• **{_fmt(x['amount'])} đ** — {(x['content'] or '')[:40]}  _{x.get('date','')}_" for x in r["txn_no_order"]]
+    blk_ord = _blk(f"⚠️ **Đơn CK chưa thấy tiền vào: {r['n_order_no_txn']} · {_fmt(r['sum_order_no_txn'])} đ**", ord_lines)
+    blk_txn = _blk(f"❔ **Tiền vào chưa khớp đơn: {r['n_txn_no_order']} · {_fmt(r['sum_txn_no_order'])} đ**", txn_lines)
     return {"config": {"wide_screen_mode": True},
             "header": {"template": tmpl, "title": {"tag": "plain_text", "content": title}},
             "elements": [
@@ -239,7 +239,7 @@ def build_card(r):
                 {"tag": "div", "text": {"tag": "lark_md", "content": blk_ord}},
                 {"tag": "hr"},
                 {"tag": "div", "text": {"tag": "lark_md", "content": blk_txn}},
-                {"tag": "note", "elements": [{"tag": "plain_text", "content": "File Excel chi tiet dinh kem ben duoi."}]},
+                {"tag": "note", "elements": [{"tag": "plain_text", "content": "File Excel chi tiết đính kèm bên dưới."}]},
             ]}
 
 
@@ -259,31 +259,31 @@ def write_xlsx(r, path):
             w = max([len(str(headers[col-1]))] + [len(str(ws.cell(rr, col).value or "")) for rr in range(2, ws.max_row + 1)])
             ws.column_dimensions[ws.cell(1, col).column_letter].width = min(max(w + 2, 10), 48)
         ws.freeze_panes = "A2"
-    ws = wb.active; ws.title = "Tong hop"
-    ws["A1"] = "DOI CHIEU DON CHUYEN KHOAN vs TIEN VAO"; ws["A1"].font = Font(bold=True, size=13)
-    ws["A2"] = f"Ky: {r['start']} .. {r['end']}"
-    ws.append([]); ws.append(["Nhom", "So don/GD", "So tien (d)"])
+    ws = wb.active; ws.title = "Tổng hợp"
+    ws["A1"] = "ĐỐI CHIẾU ĐƠN CHUYỂN KHOẢN vs TIỀN VÀO"; ws["A1"].font = Font(bold=True, size=13)
+    ws["A2"] = f"Kỳ: {r['start']} .. {r['end']}"
+    ws.append([]); ws.append(["Nhóm", "Số đơn/GD", "Số tiền (đ)"])
     for c in range(1, 4):
         cell = ws.cell(4, c); cell.fill = hf; cell.font = hfont; cell.alignment = Alignment(horizontal="center")
     for name, n, s in [
-        ("Don chuyen khoan", r["n_orders"], r["sum_orders"]),
-        ("Don tien mat", r["n_cash"], r["sum_cash"]),
-        ("Don PTTT khac", r["n_other"], r["sum_other"]),
-        ("Tien vao (Sao ke 'in')", r["n_txn_in"], r["sum_txn_in"]),
-        ("KHOP", r["n_matched"], r["sum_matched"]),
-        ("Don CK khong thay tien vao", r["n_order_no_txn"], r["sum_order_no_txn"]),
-        ("Tien vao khong khop don", r["n_txn_no_order"], r["sum_txn_no_order"]),
+        ("Đơn chuyển khoản", r["n_orders"], r["sum_orders"]),
+        ("Đơn tiền mặt", r["n_cash"], r["sum_cash"]),
+        ("Đơn PTTT khác", r["n_other"], r["sum_other"]),
+        ("Tiền vào (Sao kê 'in')", r["n_txn_in"], r["sum_txn_in"]),
+        ("KHỚP", r["n_matched"], r["sum_matched"]),
+        ("Đơn CK không thấy tiền vào", r["n_order_no_txn"], r["sum_order_no_txn"]),
+        ("Tiền vào không khớp đơn", r["n_txn_no_order"], r["sum_txn_no_order"]),
     ]:
         ws.append([name, n, s])
     for row in range(5, ws.max_row + 1): ws.cell(row, 3).number_format = money
     ws.column_dimensions["A"].width = 32; ws.column_dimensions["B"].width = 12; ws.column_dimensions["C"].width = 18
-    _sheet("Khop", ["Ma don", "Ngay don", "Doanh thu don (d)", "So tien vao (d)", "Noi dung tien vao", "ID GD", "Khop theo"],
+    _sheet("Khớp", ["Mã đơn", "Ngày đơn", "Doanh thu đơn (đ)", "Số tiền vào (đ)", "Nội dung tiền vào", "ID GD", "Khớp theo"],
            [[m["order"]["code"], m["order"]["date"], m["order"]["amount"], m["txn"]["amount"], m["txn"]["content"], m["txn"]["id"], m["by"]] for m in r["matched"]], mcols=(3, 4))
-    _sheet("Don CK chua co tien vao", ["Ma don", "Ngay don", "Doanh thu don (d)", "PTTT", "Ghi chu Gobox", "Trang thai"],
-           [[o["code"], o["date"], o["amount"], o.get("pay_txt", ""), (o.get("note") or ""), UNVERIFIED_NOTE] for o in r["order_no_txn"]], mcols=(3,))
-    _sheet("Tien vao chua co don", ["Ngay", "So tien (d)", "Noi dung", "ID GD"],
+    _sheet("Đơn CK chưa có tiền vào", ["Mã đơn", "Ngày đơn", "Doanh thu đơn (đ)", "PTTT", "Ghi chú Gobox"],
+           [[o["code"], o["date"], o["amount"], o.get("pay_txt", ""), (o.get("note") or "")] for o in r["order_no_txn"]], mcols=(3,))
+    _sheet("Tiền vào chưa có đơn", ["Ngày", "Số tiền (đ)", "Nội dung", "ID GD"],
            [[x["date"], x["amount"], x["content"], x["id"]] for x in r["txn_no_order"]], mcols=(2,))
-    _sheet("Don tien mat", ["Ma don", "Ngay don", "So tien (d)", "PTTT"],
+    _sheet("Đơn tiền mặt", ["Mã đơn", "Ngày đơn", "Số tiền (đ)", "PTTT"],
            [[o["code"], o["date"], o["amount"], o.get("pay_txt", "")] for o in r.get("cash_orders", [])], mcols=(3,))
     wb.save(path); return path
 
