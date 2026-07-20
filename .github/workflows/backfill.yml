@@ -1,0 +1,25 @@
+name: Backfill xuất kho (chạy bù 1 ngày)
+on:
+  workflow_dispatch:
+    inputs:
+      ngay:
+        description: 'Ngày cần chạy bù, dạng YYYY-MM-DD (vd 2026-07-18)'
+        required: true
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Backfill xuat kho
+        env:
+          LARK_APP_ID: ${{ secrets.LARK_APP_ID }}
+          LARK_APP_SECRET: ${{ secrets.LARK_APP_SECRET }}
+          LARK_APP_TOKEN: ${{ secrets.LARK_APP_TOKEN }}
+          GOBOX_CLIENT_ID: ${{ secrets.GOBOX_CLIENT_ID }}
+          GOBOX_CLIENT_SECRET: ${{ secrets.GOBOX_CLIENT_SECRET }}
+          LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK }}
+          SYNC_DATE: ${{ github.event.inputs.ngay }}
+        run: python backfill_xk.py
