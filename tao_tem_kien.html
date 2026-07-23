@@ -7,15 +7,15 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   *{box-sizing:border-box}
-  body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f4f6fb;color:#1f2933;margin:0;padding:18px;max-width:1000px;margin:0 auto}
+  body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f4f6fb;color:#1f2933;margin:0;padding:18px;max-width:1180px;margin:0 auto}
   h1{font-size:20px;color:#1F4E78;margin:0 0 4px}
   .sub{color:#667085;font-size:13px;margin-bottom:14px}
   .cfg{display:flex;flex-wrap:wrap;gap:10px;background:#fff;padding:12px;border-radius:10px;margin-bottom:12px;box-shadow:0 1px 4px rgba(16,24,40,.06)}
   .cfg label{font-size:12px;color:#475467;display:flex;flex-direction:column;gap:3px}
   .cfg input{padding:8px;border:1px solid #cbd2dd;border-radius:8px;font-size:14px;min-width:150px}
   table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(16,24,40,.06)}
-  th{background:#2E75B6;color:#fff;font-size:12px;padding:9px 8px;text-align:left}
-  td{border-bottom:1px solid #eef0f4;padding:6px 8px;vertical-align:middle}
+  th{background:#2E75B6;color:#fff;font-size:12px;padding:9px 6px;text-align:left}
+  td{border-bottom:1px solid #eef0f4;padding:6px 6px;vertical-align:middle}
   td input{width:100%;padding:7px;border:1px solid #cbd2dd;border-radius:7px;font-size:14px}
   td.num input{text-align:right}
   td .ma{font-size:11px;color:#98a2b3;margin-top:3px;min-height:13px}
@@ -26,6 +26,7 @@
   .add{background:#eaf1fb;color:#1F4E78}
   .gen{background:#138d75;color:#fff}
   .hint{color:#98a2b3;font-size:12px;margin-top:6px}
+  .hint b{color:#475467}
 
   #print{display:none}
   .tem{width:105mm;height:148mm;padding:7mm;background:#fff;border:0.3mm dashed #bbb}
@@ -49,6 +50,19 @@
   .hsd .line{width:45mm;border-bottom:1px solid #000;min-height:1px;margin-bottom:1.5mm}
   .kien{position:absolute;right:5mm;bottom:3mm;font-size:9pt;color:#8a8f98}
 
+  /* thùng gộp nhiều mã lẻ */
+  .mixhead{text-align:center;font-weight:800;font-size:14pt;margin-top:3mm;letter-spacing:.5px}
+  .mixsub{text-align:center;font-size:10pt;color:#444;margin-top:1mm;margin-bottom:1mm}
+  .mixlist{margin-top:2mm;flex:1;overflow:hidden}
+  .mixrow{border-top:.6px solid #bbb;padding:1.8mm 0;display:flex;align-items:center;gap:2.5mm}
+  .mixrow:last-child{border-bottom:.6px solid #bbb}
+  .mixqr{flex:0 0 16mm;width:16mm;height:16mm}
+  .mixqr img,.mixqr canvas{width:16mm !important;height:16mm !important}
+  .mixL{min-width:0;flex:1}
+  .mixname{font-weight:700;font-size:11.5pt;line-height:1.12}
+  .mixmeta{font-size:9pt;color:#333;margin-top:.6mm}
+  .mixQ{font-weight:800;font-size:13pt;white-space:nowrap}
+
   @media print{
     body{background:#fff;padding:0;max-width:none}
     .noprint{display:none !important}
@@ -61,7 +75,7 @@
 
 <div class="noprint">
   <h1>🏷️ Tạo tem kiện — Cheng</h1>
-  <div class="sub">Chọn tên sản phẩm trong danh mục (mã QR tự lấy). Nhập Quy cách, HSD, Số thùng → bấm “Tạo tem &amp; In”. Khổ A6 (105×148mm), mỗi thùng 1 tem.</div>
+  <div class="sub">Chọn tên sản phẩm trong danh mục (mã QR tự lấy). Nhập ĐVT, Quy cách, HSD, Số thùng (nguyên) và Số lẻ nếu có → bấm “Tạo tem &amp; In”. Khổ A6 (105×148mm), 4 tem / trang A4.</div>
 
   <div class="cfg">
     <label>Kho xuất<input id="src" value="Sài Gòn"></label>
@@ -73,13 +87,15 @@
   <table>
     <thead>
       <tr>
-        <th style="width:24%">Tên sản phẩm (chọn trong danh mục)</th>
-        <th style="width:15%">Quy cách</th>
-        <th style="width:12%">Dung tích</th>
-        <th style="width:13%">HSD</th>
-        <th style="width:16%">Ghi chú</th>
-        <th style="width:12%">Số thùng</th>
-        <th style="width:8%"></th>
+        <th style="width:23%">Tên sản phẩm (chọn trong danh mục)</th>
+        <th style="width:9%">ĐVT</th>
+        <th style="width:13%">Quy cách</th>
+        <th style="width:10%">Dung tích</th>
+        <th style="width:12%">HSD</th>
+        <th style="width:12%">Ghi chú</th>
+        <th style="width:8%">Số lượng</th>
+        <th style="width:9%">Gộp lẻ chung thùng</th>
+        <th style="width:4%"></th>
       </tr>
     </thead>
     <tbody id="rows"></tbody>
@@ -89,13 +105,18 @@
     <button class="btn add" onclick="addRow()">➕ Thêm dòng</button>
     <button class="btn gen" onclick="genTem()">🖨️ Tạo tem &amp; In</button>
   </div>
-  <div class="hint">Gõ vài chữ trong ô Tên để lọc danh mục rồi chọn. Nếu tên đúng danh mục sẽ hiện “Mã: …” màu xám; nếu đỏ là chưa khớp danh mục.</div>
+  <div class="hint">
+    <b>ĐVT = Thùng</b> → thùng nguyên: Số lượng là số thùng, in 1 tem/thùng (mỗi thùng 1 mã). &nbsp;
+    <b>ĐVT khác</b> (Hộp/Lọ/Gói/Chai…) → hàng lẻ: Số lượng là số lượng lẻ, các mã sẽ được gộp vào thùng chung. &nbsp;
+    <b>Gộp lẻ chung thùng</b>: các mã lẻ ghi CÙNG một nhóm (vd “A”) đóng chung 1 thùng và in chung 1 tem liệt kê các mã bên trong. Để trống = mã lẻ đó đóng riêng 1 thùng.
+    Số thứ tự “Kiện x/N” luôn tính trên TỔNG số thùng (gồm cả thùng gộp).
+  </div>
 </div>
 
 <div id="print"></div>
 
 <script>
-var CATALOG = [{"t": "Dầu gội tím 100ml (lọ)", "g": "1082736", "s": "kv100ml", "qc": "50 lọ/thùng", "en": "PURPLE SHAMPOO NO YELLOW"}, {"t": "Dầu gội tím 20ml (lọ)", "g": "1082729", "s": "kv20ml", "qc": "100 lọ/thùng", "en": "PURPLE SHAMPOO NO YELLOW"}, {"t": "Dầu gội tím 50ml (lọ)", "g": "1082732", "s": "kv50ml", "qc": "50 lọ/thùng", "en": "PURPLE SHAMPOO NO YELLOW"}, {"t": "Hũ ủ hồng ziemlich (hộp)", "g": "1082752", "s": "huhong", "qc": "45 hộp/thùng", "en": "HAIR MASK INTENSIVE RECOVERY"}, {"t": "Hũ ủ tím ziemlich (hộp)", "g": "1082757", "s": "hutim", "qc": "88 hộp/thùng", "en": "HAIR MASK KERATIN COMPLEX"}, {"t": "Keratin ziemlich (lọ)", "g": "1082767", "s": "krt", "qc": "100 lọ/thùng", "en": "KERATIN COLLAGEN"}, {"t": "Nước Hoa Blue Shirt - 10ML (lọ)", "g": "1088305", "s": "z10ml", "qc": "", "en": "BLUE SHIRT"}, {"t": "Nước Hoa Blue Shirt - 2ML (lọ)", "g": "1088276", "s": "z2ml", "qc": "", "en": "BLUE SHIRT"}, {"t": "Nước Hoa Blue Shirt - 30ML (lọ)", "g": "1088323", "s": "z30ml", "qc": "", "en": "BLUE SHIRT"}, {"t": "Nước Hoa DARK BEAUTY - 10ML (lọ)", "g": "1088291", "s": "db10ml", "qc": "", "en": "DARK BEAUTY"}, {"t": "Nước Hoa DARK BEAUTY - 2ML (lọ)", "g": "1088258", "s": "db2ml", "qc": "", "en": "DARK BEAUTY"}, {"t": "Nước Hoa DARK BEAUTY - 30ML (lọ)", "g": "1088313", "s": "db30ml", "qc": "", "en": "DARK BEAUTY"}, {"t": "Nước Hoa FIRST LOVE - 10ML (lọ)", "g": "1088300", "s": "fl10ml", "qc": "", "en": "FIRST LOVE"}, {"t": "Nước Hoa FIRST LOVE - 2ML (lọ)", "g": "1088267", "s": "fl2ml", "qc": "", "en": "FIRST LOVE"}, {"t": "Nước Hoa FIRST LOVE - 30ML (lọ)", "g": "1088318", "s": "fl30ml", "qc": "", "en": "FIRST LOVE"}, {"t": "Nước Hoa GIRL POWER - 10ML (lọ)", "g": "1088301", "s": "gp10ml", "qc": "", "en": "GIRL POWER"}, {"t": "Nước Hoa GIRL POWER - 2ML (lọ)", "g": "1088269", "s": "gp2ml", "qc": "", "en": "GIRL POWER"}, {"t": "Nước Hoa GIRL POWER - 30ML (lọ)", "g": "1088319", "s": "gp30ml", "qc": "", "en": "GIRL POWER"}, {"t": "Nước Hoa JASMINE AMBER - 10ML (lọ)", "g": "1088289", "s": "ja10ml", "qc": "", "en": "JASMINE & AMBER"}, {"t": "Nước Hoa JASMINE AMBER - 2ML (lọ)", "g": "1088256", "s": "ja2ml", "qc": "", "en": "JASMINE & AMBER"}, {"t": "Nước Hoa JASMINE AMBER - 30ML (lọ)", "g": "1088312", "s": "ja30ml", "qc": "", "en": "JASMINE & AMBER"}, {"t": "Nước Hoa LADYKILLER - 10ML (lọ)", "g": "1088295", "s": "lk10ml", "qc": "", "en": "LADYKILLER"}, {"t": "Nước Hoa LADYKILLER - 2ML (lọ)", "g": "1088261", "s": "lk2ml", "qc": "", "en": "LADYKILLER"}, {"t": "Nước Hoa LADYKILLER - 30ML (lọ)", "g": "1088315", "s": "lk30ml", "qc": "", "en": "LADYKILLER"}, {"t": "Nước Hoa VENUS - 10ML (lọ)", "g": "1088297", "s": "vn10ml", "qc": "", "en": "VENUS"}, {"t": "Nước Hoa VENUS - 2ML (lọ)", "g": "1088263", "s": "vn2ml", "qc": "", "en": "VENUS"}, {"t": "Nước Hoa VENUS - 30ML (lọ)", "g": "1088316", "s": "vn30ml", "qc": "", "en": "VENUS"}, {"t": "Sữa tắm Dark Beauty (chai)", "g": "1088268", "s": "stdb", "qc": "", "en": "SHOWER PERFUME GEL DARK BEAUTY"}, {"t": "Sữa tắm First Love (chai)", "g": "1088275", "s": "stfl", "qc": "", "en": "SHOWER PERFUME GEL FIRST LOVE"}, {"t": "Sữa tắm Girl Power (chai)", "g": "1088273", "s": "stgp", "qc": "", "en": "SHOWER PERFUME GEL GIRL POWER"}, {"t": "Sữa tắm Jasmine Amber (chai)", "g": "1088277", "s": "stja", "qc": "", "en": "SHOWER PERFUME GEL JASMINE & AMBER"}, {"t": "Sữa tắm Venus (chai)", "g": "1088270", "s": "stvn", "qc": "", "en": "SHOWER PERFUME GEL VENUS"}, {"t": "Trợ oxy 12% (lọ)", "g": "1082724", "s": "0.12", "qc": "168 lọ/thùng", "en": "HYDROGEN PEROXIDE"}, {"t": "Trợ oxy 3% (lọ)", "g": "1082708", "s": "0.03", "qc": "168 lọ/thùng", "en": "HYDROGEN PEROXIDE"}, {"t": "Trợ oxy 6% (lọ)", "g": "1082714", "s": "0.06", "qc": "168 lọ/thùng", "en": "HYDROGEN PEROXIDE"}, {"t": "Trợ oxy 9% (lọ)", "g": "1082718", "s": "0.09", "qc": "168 lọ/thùng", "en": "HYDROGEN PEROXIDE"}, {"t": "Tẩy ziemlich bé (hộp)", "g": "1082798", "s": "tb", "qc": "50 hộp/thùng", "en": "BLEACHING KIT"}, {"t": "Tẩy ziemlich to (hộp)", "g": "1082803", "s": "tt", "qc": "104 hộp/thùng", "en": "BLEACHING KIT"}, {"t": "Ủ ziemlich hồng (gói)", "g": "1082694", "s": "uhong", "qc": "600 gói/thùng", "en": "HAIR MASK INTENSIVE RECOVERY"}, {"t": "Ủ ziemlich tím (gói)", "g": "1082699", "s": "utim", "qc": "600 gói/thùng", "en": "HAIR MASK KERATIN COMPLEX"}];
+var CATALOG = [{"t": "Dầu gội tím 100ml (lọ)", "g": "1082736", "s": "kv100ml", "qc": "50 lọ/thùng", "en": "PURPLE SHAMPOO NO YELLOW"}, {"t": "Dầu gội tím 20ml (lọ)", "g": "1082729", "s": "kv20ml", "qc": "100 lọ/thùng", "en": "PURPLE SHAMPOO NO YELLOW"}, {"t": "Dầu gội tím 50ml (lọ)", "g": "1082732", "s": "kv50ml", "qc": "50 lọ/thùng", "en": "PURPLE SHAMPOO NO YELLOW"}, {"t": "Hũ ủ hồng ziemlich (hộp)", "g": "1082752", "s": "huhong", "qc": "45 hộp/thùng", "en": "HAIR MASK INTENSIVE RECOVERY"}, {"t": "Hũ ủ tím ziemlich (hộp)", "g": "1082757", "s": "hutim", "qc": "88 hộp/thùng", "en": "HAIR MASK KERATIN COMPLEX"}, {"t": "Keratin ziemlich (lọ)", "g": "1082767", "s": "krt", "qc": "100 lọ/thùng", "en": "KERATIN COLLAGEN"}, {"t": "Nước Hoa Blue Shirt - 10ML (lọ)", "g": "1088305", "s": "z10ml", "qc": "", "en": "BLUE SHIRT"}, {"t": "Nước Hoa Blue Shirt - 2ML (lọ)", "g": "1088276", "s": "z2ml", "qc": "", "en": "BLUE SHIRT"}, {"t": "Nước Hoa Blue Shirt - 30ML (lọ)", "g": "1088323", "s": "z30ml", "qc": "", "en": "BLUE SHIRT"}, {"t": "Nước Hoa DARK BEAUTY - 10ML (lọ)", "g": "1088291", "s": "db10ml", "qc": "", "en": "DARK BEAUTY"}, {"t": "Nước Hoa DARK BEAUTY - 2ML (lọ)", "g": "1088258", "s": "db2ml", "qc": "", "en": "DARK BEAUTY"}, {"t": "Nước Hoa DARK BEAUTY - 30ML (lọ)", "g": "1088313", "s": "db30ml", "qc": "", "en": "DARK BEAUTY"}, {"t": "Nước Hoa FIRST LOVE - 10ML (lọ)", "g": "1088300", "s": "fl10ml", "qc": "", "en": "FIRST LOVE"}, {"t": "Nước Hoa FIRST LOVE - 2ML (lọ)", "g": "1088267", "s": "fl2ml", "qc": "", "en": "FIRST LOVE"}, {"t": "Nước Hoa FIRST LOVE - 30ML (lọ)", "g": "1088318", "s": "fl30ml", "qc": "", "en": "FIRST LOVE"}, {"t": "Nước Hoa GIRL POWER - 10ML (lọ)", "g": "1088301", "s": "gp10ml", "qc": "", "en": "GIRL POWER"}, {"t": "Nước Hoa GIRL POWER - 2ML (lọ)", "g": "1088269", "s": "gp2ml", "qc": "", "en": "GIRL POWER"}, {"t": "Nước Hoa GIRL POWER - 30ML (lọ)", "g": "1088319", "s": "gp30ml", "qc": "", "en": "GIRL POWER"}, {"t": "Nước Hoa JASMINE AMBER - 10ML (lọ)", "g": "1088289", "s": "ja10ml", "qc": "", "en": "JASMINE & AMBER"}, {"t": "Nước Hoa JASMINE AMBER - 2ML (lọ)", "g": "1088256", "s": "ja2ml", "qc": "", "en": "JASMINE & AMBER"}, {"t": "Nước Hoa JASMINE AMBER - 30ML (lọ)", "g": "1088312", "s": "ja30ml", "qc": "", "en": "JASMINE & AMBER"}, {"t": "Nước Hoa LADYKILLER - 10ML (lọ)", "g": "1088295", "s": "lk10ml", "qc": "", "en": "LADYKILLER"}, {"t": "Nước Hoa LADYKILLER - 2ML (lọ)", "g": "1088261", "s": "lk2ml", "qc": "", "en": "LADYKILLER"}, {"t": "Nước Hoa LADYKILLER - 30ML (lọ)", "g": "1088315", "s": "lk30ml", "qc": "", "en": "LADYKILLER"}, {"t": "Nước Hoa VENUS - 10ML (lọ)", "g": "1088297", "s": "vn10ml", "qc": "", "en": "VENUS"}, {"t": "Nước Hoa VENUS - 2ML (lọ)", "g": "1088263", "s": "vn2ml", "qc": "", "en": "VENUS"}, {"t": "Nước Hoa VENUS - 30ML (lọ)", "g": "1088316", "s": "vn30ml", "qc": "", "en": "VENUS"}, {"t": "Sữa tắm Dark Beauty (chai)", "g": "1088268", "s": "stdb", "qc": "", "en": "SHOWER PERFUME GEL DARK BEAUTY"}, {"t": "Sữa tắm First Love (chai)", "g": "1088275", "s": "stfl", "qc": "", "en": "SHOWER PERFUME GEL FIRST LOVE"}, {"t": "Sữa tắm Girl Power (chai)", "g": "1088273", "s": "stgp", "qc": "", "en": "SHOWER PERFUME GEL GIRL POWER"}, {"t": "Sữa tắm Jasmine Amber (chai)", "g": "1088277", "s": "stja", "qc": "", "en": "SHOWER PERFUME GEL JASMINE & AMBER"}, {"t": "Sữa tắm Venus (chai)", "g": "1088270", "s": "stvn", "qc": "", "en": "SHOWER PERFUME GEL VENUS"}, {"t": "Trợ oxy 12% (lọ)", "g": "1082724", "s": "0.12", "qc": "168 lọ/thùng", "en": "HYDROGEN PEROXIDE"}, {"t": "Trợ oxy 3% (lọ)", "g": "1082708", "s": "0.03", "qc": "168 lọ/thùng", "en": "HYDROGEN PEROXIDE"}, {"t": "Trợ oxy 6% (lọ)", "g": "1082714", "s": "0.06", "qc": "168 lọ/thùng", "en": "HYDROGEN PEROXIDE"}, {"t": "Trợ oxy 9% (lọ)", "g": "1082718", "s": "0.09", "qc": "168 lọ/thùng", "en": "HYDROGEN PEROXIDE"}, {"t": "Tinh dầu 100ml (lọ)", "g": "1082748", "s": "td100ml", "qc": "100 lọ/thùng", "en": "HAIR ESSENTIAL OIL"}, {"t": "Tẩy ziemlich bé (hộp)", "g": "1082798", "s": "tb", "qc": "50 hộp/thùng", "en": "BLEACHING KIT"}, {"t": "Tẩy ziemlich to (hộp)", "g": "1082803", "s": "tt", "qc": "104 hộp/thùng", "en": "BLEACHING KIT"}, {"t": "Ủ ziemlich hồng (gói)", "g": "1082694", "s": "uhong", "qc": "600 gói/thùng", "en": "HAIR MASK INTENSIVE RECOVERY"}, {"t": "Ủ ziemlich tím (gói)", "g": "1082699", "s": "utim", "qc": "600 gói/thùng", "en": "HAIR MASK KERATIN COMPLEX"}];
 function norm(s){return (s||'').replace(/\s+/g,' ').trim().toLowerCase();}
 var MAP = {};
 CATALOG.forEach(function(c){ MAP[norm(c.t)] = c; });
@@ -123,11 +144,13 @@ function addRow(v){
   var tr=document.createElement('tr');
   tr.innerHTML=
     '<td><input class="c-ten" list="prods" placeholder="Gõ để tìm..." value="'+(v.ten||'')+'" oninput="onTen(this)"><div class="ma"></div></td>'+
+    '<td><input class="c-dvt" value="'+(v.dvt||'Thùng')+'"></td>'+
     '<td><input class="c-qc" placeholder="Vd: 45 hộp/thùng" value="'+(v.qc||'')+'"></td>'+
     '<td><input class="c-dt" placeholder="Vd: 30ml" value="'+(v.dt||'')+'"></td>'+
     '<td><input type="date" class="c-hsd" value="'+(v.hsd||'')+'"></td>'+
     '<td><input class="c-gc" placeholder="Vd: dễ vỡ..." value="'+(v.gc||'')+'"></td>'+
-    '<td class="num"><input class="c-sl" type="number" min="1" step="1" value="'+(v.sl||1)+'"></td>'+
+    '<td class="num"><input class="c-sl" type="number" min="0" step="1" value="'+(v.sl!=null?v.sl:1)+'"></td>'+
+    '<td><input class="c-grp" placeholder="vd: A" value="'+(v.grp||'')+'"></td>'+
     '<td style="text-align:center"><button class="del" onclick="this.closest(\'tr\').remove()">✕</button></td>';
   document.getElementById('rows').appendChild(tr);
   if(v.ten) onTen(tr.querySelector('.c-ten'));
@@ -137,39 +160,61 @@ function fmtHSD(v){
   var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(v||'');
   return m ? (m[3]+'/'+m[2]+'/'+m[1]) : (v||'');
 }
+
 function genTem(){
   var src=document.getElementById('src').value.trim(), dst=document.getElementById('dst').value.trim();
   var route=(src&&dst)?(src+' → '+dst):(src||dst||'');
   var trs=document.querySelectorAll('#rows tr'); var items=[]; var bad=[];
   trs.forEach(function(tr){
     var ten=tr.querySelector('.c-ten').value.trim();
+    var dvt=tr.querySelector('.c-dvt').value.trim()||'Thùng';
     var qc=tr.querySelector('.c-qc').value.trim();
     var dt=tr.querySelector('.c-dt').value.trim();
     var hsd=tr.querySelector('.c-hsd').value.trim();
     var gc=tr.querySelector('.c-gc').value.trim();
     var sl=parseInt(tr.querySelector('.c-sl').value,10)||0;
+    var grp=tr.querySelector('.c-grp').value.trim();
     if(!ten||sl<=0) return;
     var m=MAP[norm(ten)];
     if(!m){ bad.push(ten); return; }
-    items.push({ten:m.t, en:m.en||"", g:m.g, s:m.s, qc:qc, dt:dt, hsd:hsd, gc:gc, sl:sl});
+    var isBox = /th[uùũ]ng/.test(norm(dvt));   // ĐVT = Thùng -> thùng nguyên
+    items.push({ten:m.t, en:m.en||"", g:m.g, s:m.s, qc:qc, dt:dt, hsd:hsd, gc:gc, dvt:dvt, sl:sl, grp:grp, isBox:isBox});
   });
   if(bad.length){ if(!confirm('Các mã CHƯA khớp danh mục (sẽ bỏ qua):\n- '+bad.join('\n- ')+'\n\nTiếp tục in phần còn lại?')) return; }
-  if(items.length===0){ alert('Chưa có dòng hợp lệ (Tên phải chọn trong danh mục, Số thùng ≥ 1).'); return; }
+  if(items.length===0){ alert('Chưa có dòng hợp lệ (Tên phải chọn trong danh mục, Số lượng ≥ 1).'); return; }
 
-  var M=items.reduce(function(a,b){return a+b.sl;},0);
-  var out=document.getElementById('print'); out.innerHTML=''; var g=0;
+  // Dựng danh sách THÙNG: thùng nguyên (ĐVT=Thùng) trước, thùng gộp lẻ sau
+  var boxes=[];
+  items.forEach(function(it){
+    if(it.isBox) for(var k=1;k<=it.sl;k++) boxes.push({type:'full', it:it, k:k, n:it.sl});
+  });
+  var groups={}, order=[];
+  items.forEach(function(it,idx){
+    if(!it.isBox){
+      var key = it.grp ? ('G:'+norm(it.grp)) : ('R:'+idx);
+      if(!groups[key]){ groups[key]={grp:it.grp, products:[]}; order.push(key); }
+      groups[key].products.push(it);
+    }
+  });
+  order.forEach(function(key){ boxes.push({type:'mixed', grp:groups[key].grp, products:groups[key].products}); });
+
+  var M=boxes.length;
+  var out=document.getElementById('print'); out.innerHTML='';
   var page=null, onPage=0;
   function newPage(){ page=document.createElement('div'); page.className='page'; out.appendChild(page); onPage=0; }
   newPage();
-  items.forEach(function(it){
-    for(var k=1;k<=it.sl;k++){
-      if(onPage===4) newPage();
-      g++;
+
+  boxes.forEach(function(bx,bi){
+    if(onPage===4) newPage();
+    var g=bi+1;
+    var tem=document.createElement('div'); tem.className='tem';
+
+    if(bx.type==='full'){
+      var it=bx.it;
       var longName=(it.en||it.ten).replace(/ - /g,' ').length>20;
-      var tem=document.createElement('div'); tem.className='tem';
       tem.innerHTML=
         '<div class="frame">'+
-          '<div class="top"><span class="route">'+esc(route)+'</span><span class="thung">Thùng '+k+'/'+it.sl+'</span></div>'+
+          '<div class="top"><span class="route">'+esc(route)+'</span><span class="thung">'+esc(it.dvt)+' '+bx.k+'/'+bx.n+'</span></div>'+
           '<hr class="divider">'+
           '<div class="qrwrap"><div class="qr"></div></div>'+
           '<div class="sku">SKU: '+esc(it.s||it.g)+'</div>'+
@@ -183,12 +228,40 @@ function genTem(){
         '</div>';
       page.appendChild(tem); onPage++;
       new QRCode(tem.querySelector('.qr'), {text:(it.g||it.s||it.ten), width:160, height:160, correctLevel:QRCode.CorrectLevel.M});
+    } else {
+      var rowsHtml = bx.products.map(function(pr){
+        var meta='SKU: '+esc(pr.s||pr.g);
+        if(pr.dt) meta+=' · '+esc(pr.dt);
+        if(pr.hsd) meta+=' · HSD '+esc(fmtHSD(pr.hsd));
+        if(pr.gc) meta+=' · '+esc(pr.gc);
+        return '<div class="mixrow"><div class="mixqr" data-qr="'+esc(pr.g||pr.s||pr.ten)+'"></div><div class="mixL">'+
+                 '<div class="mixname">'+nameHtml(pr.ten)+(pr.en?(' <span style="font-weight:600;color:#555">('+esc(pr.en)+')</span>'):'')+'</div>'+
+                 '<div class="mixmeta">'+meta+'</div>'+
+               '</div><div class="mixQ">'+pr.sl+' '+esc(pr.dvt)+'</div></div>';
+      }).join('');
+      var mixTitle = bx.products.length>1 ? ('Thùng gộp'+(bx.grp?(' '+esc(bx.grp)):'')) : 'Thùng lẻ';
+      tem.innerHTML=
+        '<div class="frame">'+
+          '<div class="top"><span class="route">'+esc(route)+'</span><span class="thung">'+mixTitle+'</span></div>'+
+          '<hr class="divider">'+
+          '<div class="mixhead">HÀNG LẺ – NHIỀU MÃ</div>'+
+          '<div class="mixsub">'+bx.products.length+' mã trong thùng · số lượng kèm đơn vị</div>'+
+          '<div class="mixlist">'+rowsHtml+'</div>'+
+          '<div class="kien">Kiện '+g+'/'+M+'</div>'+
+        '</div>';
+      page.appendChild(tem); onPage++;
+      tem.querySelectorAll('.mixqr').forEach(function(el){
+        new QRCode(el, {text:el.getAttribute('data-qr'), width:140, height:140, correctLevel:QRCode.CorrectLevel.M});
+      });
     }
   });
-  setTimeout(function(){ window.print(); }, 350);
+  setTimeout(function(){ window.print(); }, 400);
 }
 
-addRow({ten:'Hũ ủ hồng ziemlich (hộp)',qc:'45 hộp/thùng',sl:5});
+// dòng mẫu
+addRow({ten:'Hũ ủ hồng ziemlich (hộp)',dvt:'Thùng',qc:'45 hộp/thùng',sl:5});
+addRow({ten:'Trợ oxy 6% (lọ)',dvt:'Lọ',qc:'168 lọ/thùng',sl:20,grp:'A'});
+addRow({ten:'Trợ oxy 9% (lọ)',dvt:'Lọ',qc:'168 lọ/thùng',sl:15,grp:'A'});
 addRow();
 </script>
 </body>
