@@ -63,6 +63,31 @@
   .mixmeta{font-size:9pt;color:#333;margin-top:.6mm}
   .mixQ{font-weight:800;font-size:13pt;white-space:nowrap}
 
+  /* Quản lý danh mục */
+  .mgr{background:#fff;border:1px solid #dbe2ee;border-radius:10px;margin-bottom:12px;box-shadow:0 1px 4px rgba(16,24,40,.06);overflow:hidden}
+  .mgr>summary{cursor:pointer;padding:12px 14px;font-weight:700;color:#1F4E78;list-style:none;user-select:none;background:#eef3fb}
+  .mgr>summary::-webkit-details-marker{display:none}
+  .mgr>summary::before{content:"▸ ";font-size:12px}
+  .mgr[open]>summary::before{content:"▾ "}
+  .mgrbody{padding:14px}
+  .mgrform{display:grid;grid-template-columns:1.5fr 1.4fr 1fr 1fr 1.1fr auto;gap:8px;align-items:end}
+  @media(max-width:760px){.mgrform{grid-template-columns:1fr 1fr}}
+  .mgrform label{font-size:12px;color:#475467;display:flex;flex-direction:column;gap:3px}
+  .mgrform input{padding:8px;border:1px solid #cbd2dd;border-radius:8px;font-size:14px;width:100%}
+  .mgrbtn{border:0;border-radius:8px;padding:10px 14px;font-weight:700;cursor:pointer;font-size:14px}
+  .mgrbtn.save{background:#138d75;color:#fff}
+  .mgrbtn.sec{background:#eaf1fb;color:#1F4E78}
+  .mgrbtn.warn{background:#fdecea;color:#c0392b}
+  .mgrbar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+  .mgrsearch{padding:8px;border:1px solid #cbd2dd;border-radius:8px;font-size:14px;width:100%;max-width:320px;margin-bottom:8px}
+  .mgrtbl{width:100%;border-collapse:collapse;font-size:13px}
+  .mgrtbl th{background:#2E75B6;color:#fff;padding:7px 8px;text-align:left;font-size:12px;position:sticky;top:0}
+  .mgrtbl td{border-bottom:1px solid #eef0f4;padding:5px 8px;vertical-align:top}
+  .mgrwrap{max-height:340px;overflow:auto;border:1px solid #eef0f4;border-radius:8px}
+  .mgrdel{background:#fdecea;color:#c0392b;border:0;border-radius:6px;padding:5px 9px;cursor:pointer;font-weight:700}
+  .mgredit{background:#fff7e6;color:#b7791f;border:0;border-radius:6px;padding:5px 9px;cursor:pointer;font-weight:700;margin-right:4px}
+  .mgrcount{color:#667085;font-size:12px}
+
   @media print{
     body{background:#fff;padding:0;max-width:none}
     .noprint{display:none !important}
@@ -82,6 +107,40 @@
     <label>Kho nhập<input id="dst" value="Hà Nội"></label>
   </div>
 
+  <details class="mgr">
+    <summary>⚙️ Quản lý danh mục sản phẩm — thêm / sửa / xoá</summary>
+    <div class="mgrbody">
+      <div style="font-size:12px;color:#667085;margin-bottom:10px">
+        <b>Mã QR (G SKU)</b> = mã dùng cho QR (nhập kho Gobox). <b>Mã SKU</b> = mã in dưới QR trên tem (để trống thì tem ẩn dòng SKU).
+        Bấm “Lưu vào danh mục” là chọn được ngay. Danh mục lưu trên trình duyệt này.
+      </div>
+      <div class="mgrform">
+        <label>Tên tiếng Việt *<input id="m_t" placeholder="Vd: Trợ oxy 6% (lọ)"></label>
+        <label>Tên tiếng Anh (công bố)<input id="m_en" placeholder="Vd: HYDROGEN PEROXIDE"></label>
+        <label>Mã QR (G SKU) *<input id="m_g" placeholder="Vd: 1082714"></label>
+        <label>Mã SKU (in trên tem)<input id="m_s" placeholder="Vd: td30ml"></label>
+        <label>Quy cách gợi ý<input id="m_qc" placeholder="Vd: 168 lọ/thùng"></label>
+        <button class="mgrbtn save" id="m_add" onclick="mgrAddOrUpdate()">💾 Lưu vào danh mục</button>
+      </div>
+      <input type="hidden" id="m_edit">
+      <div class="mgrbar">
+        <button class="mgrbtn save" onclick="mgrPublish()">☁️ Cập nhật lên link (cho NCC thấy)</button>
+        <button class="mgrbtn sec" onclick="mgrExport()">⬇️ Xuất file JSON</button>
+        <label class="mgrbtn sec" style="display:inline-block">⬆️ Nhập file JSON<input type="file" accept=".json,application/json" onchange="mgrImport(event)" style="display:none"></label>
+        <button class="mgrbtn warn" onclick="mgrReset()">↺ Khôi phục danh mục gốc</button>
+      </div>
+      <div class="mgrcount" id="m_cloud" style="margin-bottom:6px"></div>
+      <input class="mgrsearch" id="m_search" placeholder="🔎 Tìm trong danh mục..." oninput="mgrRender()">
+      <div class="mgrcount" id="m_count"></div>
+      <div class="mgrwrap">
+        <table class="mgrtbl"><thead><tr>
+          <th style="width:30%">Tên tiếng Việt</th><th style="width:20%">Tên tiếng Anh</th>
+          <th style="width:14%">Mã QR</th><th style="width:12%">Mã SKU</th><th style="width:16%">Quy cách</th><th style="width:8%"></th>
+        </tr></thead><tbody id="m_list"></tbody></table>
+      </div>
+    </div>
+  </details>
+
   <datalist id="prods"></datalist>
 
   <table>
@@ -90,10 +149,11 @@
         <th style="width:23%">Tên sản phẩm (chọn trong danh mục)</th>
         <th style="width:9%">ĐVT</th>
         <th style="width:13%">Quy cách</th>
-        <th style="width:10%">Dung tích</th>
-        <th style="width:12%">HSD</th>
-        <th style="width:12%">Ghi chú</th>
-        <th style="width:8%">Số lượng</th>
+        <th style="width:9%">Dung tích</th>
+        <th style="width:10%">Số lô SX</th>
+        <th style="width:11%">HSD</th>
+        <th style="width:11%">Ghi chú</th>
+        <th style="width:7%">Số lượng</th>
         <th style="width:9%">Gộp lẻ chung thùng</th>
         <th style="width:4%"></th>
       </tr>
@@ -116,18 +176,122 @@
 <div id="print"></div>
 
 <script>
-var CATALOG = [{"t": "Dầu gội tím 100ml (lọ)", "g": "1082736", "s": "kv100ml", "qc": "50 lọ/thùng", "en": "PURPLE SHAMPOO NO YELLOW"}, {"t": "Dầu gội tím 20ml (lọ)", "g": "1082729", "s": "kv20ml", "qc": "100 lọ/thùng", "en": "PURPLE SHAMPOO NO YELLOW"}, {"t": "Dầu gội tím 50ml (lọ)", "g": "1082732", "s": "kv50ml", "qc": "50 lọ/thùng", "en": "PURPLE SHAMPOO NO YELLOW"}, {"t": "Hũ ủ hồng ziemlich (hộp)", "g": "1082752", "s": "huhong", "qc": "45 hộp/thùng", "en": "HAIR MASK INTENSIVE RECOVERY"}, {"t": "Hũ ủ tím ziemlich (hộp)", "g": "1082757", "s": "hutim", "qc": "88 hộp/thùng", "en": "HAIR MASK KERATIN COMPLEX"}, {"t": "Keratin ziemlich (lọ)", "g": "1082767", "s": "krt", "qc": "100 lọ/thùng", "en": "KERATIN COLLAGEN"}, {"t": "Nước Hoa Blue Shirt - 10ML (lọ)", "g": "1088305", "s": "z10ml", "qc": "", "en": "BLUE SHIRT"}, {"t": "Nước Hoa Blue Shirt - 2ML (lọ)", "g": "1088276", "s": "z2ml", "qc": "", "en": "BLUE SHIRT"}, {"t": "Nước Hoa Blue Shirt - 30ML (lọ)", "g": "1088323", "s": "z30ml", "qc": "", "en": "BLUE SHIRT"}, {"t": "Nước Hoa DARK BEAUTY - 10ML (lọ)", "g": "1088291", "s": "db10ml", "qc": "", "en": "DARK BEAUTY"}, {"t": "Nước Hoa DARK BEAUTY - 2ML (lọ)", "g": "1088258", "s": "db2ml", "qc": "", "en": "DARK BEAUTY"}, {"t": "Nước Hoa DARK BEAUTY - 30ML (lọ)", "g": "1088313", "s": "db30ml", "qc": "", "en": "DARK BEAUTY"}, {"t": "Nước Hoa FIRST LOVE - 10ML (lọ)", "g": "1088300", "s": "fl10ml", "qc": "", "en": "FIRST LOVE"}, {"t": "Nước Hoa FIRST LOVE - 2ML (lọ)", "g": "1088267", "s": "fl2ml", "qc": "", "en": "FIRST LOVE"}, {"t": "Nước Hoa FIRST LOVE - 30ML (lọ)", "g": "1088318", "s": "fl30ml", "qc": "", "en": "FIRST LOVE"}, {"t": "Nước Hoa GIRL POWER - 10ML (lọ)", "g": "1088301", "s": "gp10ml", "qc": "", "en": "GIRL POWER"}, {"t": "Nước Hoa GIRL POWER - 2ML (lọ)", "g": "1088269", "s": "gp2ml", "qc": "", "en": "GIRL POWER"}, {"t": "Nước Hoa GIRL POWER - 30ML (lọ)", "g": "1088319", "s": "gp30ml", "qc": "", "en": "GIRL POWER"}, {"t": "Nước Hoa JASMINE AMBER - 10ML (lọ)", "g": "1088289", "s": "ja10ml", "qc": "", "en": "JASMINE & AMBER"}, {"t": "Nước Hoa JASMINE AMBER - 2ML (lọ)", "g": "1088256", "s": "ja2ml", "qc": "", "en": "JASMINE & AMBER"}, {"t": "Nước Hoa JASMINE AMBER - 30ML (lọ)", "g": "1088312", "s": "ja30ml", "qc": "", "en": "JASMINE & AMBER"}, {"t": "Nước Hoa LADYKILLER - 10ML (lọ)", "g": "1088295", "s": "lk10ml", "qc": "", "en": "LADYKILLER"}, {"t": "Nước Hoa LADYKILLER - 2ML (lọ)", "g": "1088261", "s": "lk2ml", "qc": "", "en": "LADYKILLER"}, {"t": "Nước Hoa LADYKILLER - 30ML (lọ)", "g": "1088315", "s": "lk30ml", "qc": "", "en": "LADYKILLER"}, {"t": "Nước Hoa VENUS - 10ML (lọ)", "g": "1088297", "s": "vn10ml", "qc": "", "en": "VENUS"}, {"t": "Nước Hoa VENUS - 2ML (lọ)", "g": "1088263", "s": "vn2ml", "qc": "", "en": "VENUS"}, {"t": "Nước Hoa VENUS - 30ML (lọ)", "g": "1088316", "s": "vn30ml", "qc": "", "en": "VENUS"}, {"t": "Sữa tắm Dark Beauty (chai)", "g": "1088268", "s": "stdb", "qc": "", "en": "SHOWER PERFUME GEL DARK BEAUTY"}, {"t": "Sữa tắm First Love (chai)", "g": "1088275", "s": "stfl", "qc": "", "en": "SHOWER PERFUME GEL FIRST LOVE"}, {"t": "Sữa tắm Girl Power (chai)", "g": "1088273", "s": "stgp", "qc": "", "en": "SHOWER PERFUME GEL GIRL POWER"}, {"t": "Sữa tắm Jasmine Amber (chai)", "g": "1088277", "s": "stja", "qc": "", "en": "SHOWER PERFUME GEL JASMINE & AMBER"}, {"t": "Sữa tắm Venus (chai)", "g": "1088270", "s": "stvn", "qc": "", "en": "SHOWER PERFUME GEL VENUS"}, {"t": "Trợ oxy 12% (lọ)", "g": "1082724", "s": "0.12", "qc": "168 lọ/thùng", "en": "HYDROGEN PEROXIDE"}, {"t": "Trợ oxy 3% (lọ)", "g": "1082708", "s": "0.03", "qc": "168 lọ/thùng", "en": "HYDROGEN PEROXIDE"}, {"t": "Trợ oxy 6% (lọ)", "g": "1082714", "s": "0.06", "qc": "168 lọ/thùng", "en": "HYDROGEN PEROXIDE"}, {"t": "Trợ oxy 9% (lọ)", "g": "1082718", "s": "0.09", "qc": "168 lọ/thùng", "en": "HYDROGEN PEROXIDE"}, {"t": "Tinh dầu 100ml (lọ)", "g": "1082748", "s": "td100ml", "qc": "100 lọ/thùng", "en": "HAIR ESSENTIAL OIL"}, {"t": "Tẩy ziemlich bé (hộp)", "g": "1082798", "s": "tb", "qc": "50 hộp/thùng", "en": "BLEACHING KIT"}, {"t": "Tẩy ziemlich to (hộp)", "g": "1082803", "s": "tt", "qc": "104 hộp/thùng", "en": "BLEACHING KIT"}, {"t": "Ủ ziemlich hồng (gói)", "g": "1082694", "s": "uhong", "qc": "600 gói/thùng", "en": "HAIR MASK INTENSIVE RECOVERY"}, {"t": "Ủ ziemlich tím (gói)", "g": "1082699", "s": "utim", "qc": "600 gói/thùng", "en": "HAIR MASK KERATIN COMPLEX"}];
+var BUILTIN = [{"t": "Dầu gội tím 100ml (lọ)", "g": "1082736", "s": "kv100ml", "qc": "50 lọ/thùng", "en": "PURPLE SHAMPOO NO YELLOW"}, {"t": "Dầu gội tím 20ml (lọ)", "g": "1082729", "s": "kv20ml", "qc": "100 lọ/thùng", "en": "PURPLE SHAMPOO NO YELLOW"}, {"t": "Dầu gội tím 50ml (lọ)", "g": "1082732", "s": "kv50ml", "qc": "50 lọ/thùng", "en": "PURPLE SHAMPOO NO YELLOW"}, {"t": "Hũ ủ hồng ziemlich (hộp)", "g": "1082752", "s": "huhong", "qc": "45 hộp/thùng", "en": "HAIR MASK INTENSIVE RECOVERY"}, {"t": "Hũ ủ tím ziemlich (hộp)", "g": "1082757", "s": "hutim", "qc": "88 hộp/thùng", "en": "HAIR MASK KERATIN COMPLEX"}, {"t": "Keratin ziemlich (lọ)", "g": "1082767", "s": "krt", "qc": "100 lọ/thùng", "en": "KERATIN COLLAGEN"}, {"t": "Nước Hoa Blue Shirt - 10ML (lọ)", "g": "1088305", "s": "z10ml", "qc": "", "en": "BLUE SHIRT"}, {"t": "Nước Hoa Blue Shirt - 2ML (lọ)", "g": "1088276", "s": "z2ml", "qc": "", "en": "BLUE SHIRT"}, {"t": "Nước Hoa Blue Shirt - 30ML (lọ)", "g": "1088323", "s": "z30ml", "qc": "", "en": "BLUE SHIRT"}, {"t": "Nước Hoa DARK BEAUTY - 10ML (lọ)", "g": "1088291", "s": "db10ml", "qc": "", "en": "DARK BEAUTY"}, {"t": "Nước Hoa DARK BEAUTY - 2ML (lọ)", "g": "1088258", "s": "db2ml", "qc": "", "en": "DARK BEAUTY"}, {"t": "Nước Hoa DARK BEAUTY - 30ML (lọ)", "g": "1088313", "s": "db30ml", "qc": "", "en": "DARK BEAUTY"}, {"t": "Nước Hoa FIRST LOVE - 10ML (lọ)", "g": "1088300", "s": "fl10ml", "qc": "", "en": "FIRST LOVE"}, {"t": "Nước Hoa FIRST LOVE - 2ML (lọ)", "g": "1088267", "s": "fl2ml", "qc": "", "en": "FIRST LOVE"}, {"t": "Nước Hoa FIRST LOVE - 30ML (lọ)", "g": "1088318", "s": "fl30ml", "qc": "", "en": "FIRST LOVE"}, {"t": "Nước Hoa GIRL POWER - 10ML (lọ)", "g": "1088301", "s": "gp10ml", "qc": "", "en": "GIRL POWER"}, {"t": "Nước Hoa GIRL POWER - 2ML (lọ)", "g": "1088269", "s": "gp2ml", "qc": "", "en": "GIRL POWER"}, {"t": "Nước Hoa GIRL POWER - 30ML (lọ)", "g": "1088319", "s": "gp30ml", "qc": "", "en": "GIRL POWER"}, {"t": "Nước Hoa JASMINE AMBER - 10ML (lọ)", "g": "1088289", "s": "ja10ml", "qc": "", "en": "JASMINE & AMBER"}, {"t": "Nước Hoa JASMINE AMBER - 2ML (lọ)", "g": "1088256", "s": "ja2ml", "qc": "", "en": "JASMINE & AMBER"}, {"t": "Nước Hoa JASMINE AMBER - 30ML (lọ)", "g": "1088312", "s": "ja30ml", "qc": "", "en": "JASMINE & AMBER"}, {"t": "Nước Hoa LADYKILLER - 10ML (lọ)", "g": "1088295", "s": "lk10ml", "qc": "", "en": "LADYKILLER"}, {"t": "Nước Hoa LADYKILLER - 2ML (lọ)", "g": "1088261", "s": "lk2ml", "qc": "", "en": "LADYKILLER"}, {"t": "Nước Hoa LADYKILLER - 30ML (lọ)", "g": "1088315", "s": "lk30ml", "qc": "", "en": "LADYKILLER"}, {"t": "Nước Hoa VENUS - 10ML (lọ)", "g": "1088297", "s": "vn10ml", "qc": "", "en": "VENUS"}, {"t": "Nước Hoa VENUS - 2ML (lọ)", "g": "1088263", "s": "vn2ml", "qc": "", "en": "VENUS"}, {"t": "Nước Hoa VENUS - 30ML (lọ)", "g": "1088316", "s": "vn30ml", "qc": "", "en": "VENUS"}, {"t": "Sữa tắm Dark Beauty (chai)", "g": "1088268", "s": "stdb", "qc": "", "en": "SHOWER PERFUME GEL DARK BEAUTY"}, {"t": "Sữa tắm First Love (chai)", "g": "1088275", "s": "stfl", "qc": "", "en": "SHOWER PERFUME GEL FIRST LOVE"}, {"t": "Sữa tắm Girl Power (chai)", "g": "1088273", "s": "stgp", "qc": "", "en": "SHOWER PERFUME GEL GIRL POWER"}, {"t": "Sữa tắm Jasmine Amber (chai)", "g": "1088277", "s": "stja", "qc": "", "en": "SHOWER PERFUME GEL JASMINE & AMBER"}, {"t": "Sữa tắm Venus (chai)", "g": "1088270", "s": "stvn", "qc": "", "en": "SHOWER PERFUME GEL VENUS"}, {"t": "Trợ oxy 12% (lọ)", "g": "1082724", "s": "0.12", "qc": "168 lọ/thùng", "en": "HYDROGEN PEROXIDE"}, {"t": "Trợ oxy 3% (lọ)", "g": "1082708", "s": "0.03", "qc": "168 lọ/thùng", "en": "HYDROGEN PEROXIDE"}, {"t": "Trợ oxy 6% (lọ)", "g": "1082714", "s": "0.06", "qc": "168 lọ/thùng", "en": "HYDROGEN PEROXIDE"}, {"t": "Trợ oxy 9% (lọ)", "g": "1082718", "s": "0.09", "qc": "168 lọ/thùng", "en": "HYDROGEN PEROXIDE"}, {"t": "Tinh dầu 100ml (lọ)", "g": "1082748", "s": "td100ml", "qc": "100 lọ/thùng", "en": "HAIR ESSENTIAL OIL"}, {"t": "Tẩy ziemlich bé (hộp)", "g": "1082798", "s": "tb", "qc": "50 hộp/thùng", "en": "BLEACHING KIT"}, {"t": "Tẩy ziemlich to (hộp)", "g": "1082803", "s": "tt", "qc": "104 hộp/thùng", "en": "BLEACHING KIT"}, {"t": "Ủ ziemlich hồng (gói)", "g": "1082694", "s": "uhong", "qc": "600 gói/thùng", "en": "HAIR MASK INTENSIVE RECOVERY"}, {"t": "Ủ ziemlich tím (gói)", "g": "1082699", "s": "utim", "qc": "600 gói/thùng", "en": "HAIR MASK KERATIN COMPLEX"}];
 function norm(s){return (s||'').replace(/\s+/g,' ').trim().toLowerCase();}
+var LS_KEY='cheng_tem_catalog_v1';
+function loadCatalog(){
+  try{ var s=localStorage.getItem(LS_KEY); if(s){ var a=JSON.parse(s); if(Array.isArray(a)&&a.length) return a; } }catch(e){}
+  return BUILTIN.map(function(c){return {t:c.t,g:c.g,s:c.s,qc:c.qc,en:c.en};});
+}
+var CATALOG = loadCatalog();
 var MAP = {};
-CATALOG.forEach(function(c){ MAP[norm(c.t)] = c; });
-
-// datalist
-(function(){
-  var dl = document.getElementById('prods');
-  var frag = document.createDocumentFragment();
-  CATALOG.forEach(function(c){ var o=document.createElement('option'); o.value=c.t; frag.appendChild(o); });
-  dl.appendChild(frag);
-})();
+function saveCatalog(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(CATALOG)); }catch(e){ alert('Không lưu được (trình duyệt chặn lưu trữ).'); } rebuildCatalog(); }
+function rebuildCatalog(){
+  MAP={}; CATALOG.forEach(function(c){ MAP[norm(c.t)]=c; });
+  var dl=document.getElementById('prods'); if(dl){ dl.innerHTML=''; var frag=document.createDocumentFragment();
+    CATALOG.slice().sort(function(a,b){return a.t.localeCompare(b.t);}).forEach(function(c){ var o=document.createElement('option'); o.value=c.t; frag.appendChild(o); });
+    dl.appendChild(frag); }
+  mgrRender();
+}
+function esc0(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function mgrAddOrUpdate(){
+  var t=document.getElementById('m_t').value.trim();
+  var en=document.getElementById('m_en').value.trim();
+  var g=document.getElementById('m_g').value.trim();
+  var s=document.getElementById('m_s').value.trim();
+  var qc=document.getElementById('m_qc').value.trim();
+  var editKey=document.getElementById('m_edit').value;
+  if(!t||!g){ alert('Bắt buộc nhập Tên tiếng Việt và Mã QR.'); return; }
+  var dup=CATALOG.findIndex(function(c){return norm(c.t)===norm(t);});
+  if(editKey){
+    var i=CATALOG.findIndex(function(c){return norm(c.t)===editKey;});
+    if(i>=0){ if(dup>=0&&dup!==i){ alert('Tên này đã có mã khác trong danh mục.'); return; }
+      CATALOG[i]={t:t,en:en,g:g,s:s,qc:qc}; }
+    document.getElementById('m_edit').value=''; document.getElementById('m_add').textContent='💾 Lưu vào danh mục';
+  } else {
+    if(dup>=0){ if(!confirm('Tên "'+t+'" đã có trong danh mục. Ghi đè?')) return; CATALOG[dup]={t:t,en:en,g:g,s:s,qc:qc}; }
+    else CATALOG.push({t:t,en:en,g:g,s:s,qc:qc});
+  }
+  document.getElementById('m_t').value='';document.getElementById('m_en').value='';document.getElementById('m_g').value='';document.getElementById('m_s').value='';document.getElementById('m_qc').value='';
+  saveCatalog();
+}
+function mgrEdit(key){
+  var c=CATALOG.find(function(x){return norm(x.t)===key;}); if(!c) return;
+  document.getElementById('m_t').value=c.t; document.getElementById('m_en').value=c.en||'';
+  document.getElementById('m_g').value=c.g||''; document.getElementById('m_s').value=c.s||''; document.getElementById('m_qc').value=c.qc||'';
+  document.getElementById('m_edit').value=key; document.getElementById('m_add').textContent='✏️ Cập nhật';
+  document.querySelector('.mgr').setAttribute('open','');
+  document.getElementById('m_t').focus();
+}
+function mgrDel(key){
+  var c=CATALOG.find(function(x){return norm(x.t)===key;}); if(!c) return;
+  if(!confirm('Xoá "'+c.t+'" khỏi danh mục?')) return;
+  CATALOG=CATALOG.filter(function(x){return norm(x.t)!==key;}); saveCatalog();
+}
+function mgrReset(){ if(!confirm('Khôi phục về danh mục gốc? Mọi thay đổi trên trình duyệt này sẽ mất.')) return;
+  try{localStorage.removeItem(LS_KEY);}catch(e){} CATALOG=loadCatalog(); rebuildCatalog(); }
+function mgrExport(){
+  var blob=new Blob([JSON.stringify(CATALOG,null,1)],{type:'application/json'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='danh_muc_tem_kien.json'; a.click(); setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+}
+function mgrImport(ev){
+  var f=ev.target.files&&ev.target.files[0]; if(!f) return;
+  var r=new FileReader();
+  r.onload=function(){ try{ var a=JSON.parse(r.result);
+    if(!Array.isArray(a)||!a.length){ alert('File không hợp lệ.'); return; }
+    var ok=a.filter(function(c){return c&&c.t&&c.g;}).map(function(c){return {t:c.t,g:c.g,s:c.s||'',qc:c.qc||'',en:c.en||''};});
+    if(!ok.length){ alert('File không có sản phẩm hợp lệ (cần Tên + Mã QR).'); return; }
+    if(!confirm('Nhập '+ok.length+' sản phẩm, THAY danh mục hiện tại?')) return;
+    CATALOG=ok; saveCatalog();
+  }catch(e){ alert('Không đọc được file JSON.'); } };
+  r.readAsText(f); ev.target.value='';
+}
+function mgrRender(){
+  var tb=document.getElementById('m_list'); if(!tb) return;
+  var q=norm((document.getElementById('m_search')||{}).value||'');
+  var list=CATALOG.slice().sort(function(a,b){return a.t.localeCompare(b.t);});
+  var shown=list.filter(function(c){return !q||norm(c.t).indexOf(q)>=0||norm(c.en).indexOf(q)>=0||String(c.g).indexOf(q)>=0;});
+  tb.innerHTML=shown.map(function(c){var k=norm(c.t);
+    return '<tr><td>'+esc0(c.t)+'</td><td>'+esc0(c.en||'')+'</td><td>'+esc0(c.g||'')+'</td><td>'+esc0(c.s||'')+'</td><td>'+esc0(c.qc||'')+'</td>'+
+      '<td style="white-space:nowrap"><button class="mgredit" onclick="mgrEdit(\''+k.replace(/'/g,"\\'")+'\')">Sửa</button>'+
+      '<button class="mgrdel" onclick="mgrDel(\''+k.replace(/'/g,"\\'")+'\')">Xoá</button></td></tr>';}).join('');
+  document.getElementById('m_count').textContent='Tổng '+CATALOG.length+' sản phẩm'+(q?(' · hiển thị '+shown.length):'');
+}
+var CATALOG_API='https://larkbot-laj5.onrender.com/tem-catalog';
+var ADMIN_KEY='cheng_tem_admin';
+function setCloud(msg,color){ var el=document.getElementById('m_cloud'); if(el){ el.textContent=msg; el.style.color=color||'#667085'; } }
+function fetchRemote(){
+  setCloud('⏳ Đang tải danh mục mới nhất từ server...','#667085');
+  fetch(CATALOG_API,{cache:'no-store'}).then(function(r){return r.json();}).then(function(a){
+    if(Array.isArray(a)&&a.length){
+      CATALOG=a.map(function(c){return {t:c.t,g:c.g,s:c.s||'',qc:c.qc||'',en:c.en||''};});
+      try{localStorage.setItem(LS_KEY,JSON.stringify(CATALOG));}catch(e){}
+      rebuildCatalog(); setCloud('✅ Đang dùng danh mục chung trên server ('+CATALOG.length+' SP).','#138d75');
+    } else { setCloud('ℹ️ Server chưa có danh mục chung — đang dùng danh mục trong máy. Bấm “Cập nhật lên link” để đăng.','#667085'); }
+  }).catch(function(){ setCloud('⚠️ Không kết nối được server (có thể đang ngủ) — đang dùng danh mục trong máy.','#b7791f'); });
+}
+function getAdminToken(){
+  var tk=''; try{tk=localStorage.getItem(ADMIN_KEY)||'';}catch(e){}
+  if(!tk){ tk=(prompt('Nhập MÃ QUẢN TRỊ để cập nhật danh mục lên link (chỉ chủ kho có mã này):')||'').trim();
+    if(!tk) return ''; try{localStorage.setItem(ADMIN_KEY,tk);}catch(e){} }
+  return tk;
+}
+function mgrPublish(){
+  var tk=getAdminToken(); if(!tk){ return; }
+  setCloud('⏳ Đang cập nhật lên server...','#667085');
+  fetch(CATALOG_API+'?token='+encodeURIComponent(tk),{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(CATALOG)})
+   .then(function(r){return r.json();}).then(function(d){
+     if(d.ok){ setCloud('✅ Đã cập nhật lên link ('+d.n+' SP). Người khác mở link (Ctrl+F5) sẽ thấy.','#138d75');
+       alert('✅ Đã cập nhật danh mục lên link ('+d.n+' sản phẩm).\nNCC mở link và tải lại (Ctrl+F5) sẽ thấy danh mục mới.'); }
+     else { setCloud('❌ '+(d.err||'lỗi'),'#c0392b');
+       if((d.err||'').indexOf('token')>=0){ try{localStorage.removeItem(ADMIN_KEY);}catch(e){} alert('Sai mã quản trị. Bấm lại để nhập mã đúng.'); }
+       else alert('Lỗi: '+(d.err||'?')); }
+   }).catch(function(){ setCloud('⚠️ Không kết nối được server (app có thể đang ngủ, thử lại sau ~30s).','#b7791f');
+     alert('Không kết nối được server. App Render có thể đang ngủ — thử lại sau ~30 giây.'); });
+}
+rebuildCatalog();
+fetchRemote();
 
 function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function nameHtml(ten){ return ten.split(' - ').map(function(p,i){return esc((i>0?'- ':'')+p.trim());}).join('<br>'); }
@@ -147,6 +311,7 @@ function addRow(v){
     '<td><input class="c-dvt" value="'+(v.dvt||'Thùng')+'"></td>'+
     '<td><input class="c-qc" placeholder="Vd: 45 hộp/thùng" value="'+(v.qc||'')+'"></td>'+
     '<td><input class="c-dt" placeholder="Vd: 30ml" value="'+(v.dt||'')+'"></td>'+
+    '<td><input class="c-lo" placeholder="Vd: L2607" value="'+(v.lo||'')+'"></td>'+
     '<td><input type="date" class="c-hsd" value="'+(v.hsd||'')+'"></td>'+
     '<td><input class="c-gc" placeholder="Vd: dễ vỡ..." value="'+(v.gc||'')+'"></td>'+
     '<td class="num"><input class="c-sl" type="number" min="0" step="1" value="'+(v.sl!=null?v.sl:1)+'"></td>'+
@@ -170,6 +335,7 @@ function genTem(){
     var dvt=tr.querySelector('.c-dvt').value.trim()||'Thùng';
     var qc=tr.querySelector('.c-qc').value.trim();
     var dt=tr.querySelector('.c-dt').value.trim();
+    var lo=tr.querySelector('.c-lo').value.trim();
     var hsd=tr.querySelector('.c-hsd').value.trim();
     var gc=tr.querySelector('.c-gc').value.trim();
     var sl=parseInt(tr.querySelector('.c-sl').value,10)||0;
@@ -178,7 +344,7 @@ function genTem(){
     var m=MAP[norm(ten)];
     if(!m){ bad.push(ten); return; }
     var isBox = /th[uùũ]ng/.test(norm(dvt));   // ĐVT = Thùng -> thùng nguyên
-    items.push({ten:m.t, en:m.en||"", g:m.g, s:m.s, qc:qc, dt:dt, hsd:hsd, gc:gc, dvt:dvt, sl:sl, grp:grp, isBox:isBox});
+    items.push({ten:m.t, en:m.en||"", g:m.g, s:m.s, qc:qc, dt:dt, lo:lo, hsd:hsd, gc:gc, dvt:dvt, sl:sl, grp:grp, isBox:isBox});
   });
   if(bad.length){ if(!confirm('Các mã CHƯA khớp danh mục (sẽ bỏ qua):\n- '+bad.join('\n- ')+'\n\nTiếp tục in phần còn lại?')) return; }
   if(items.length===0){ alert('Chưa có dòng hợp lệ (Tên phải chọn trong danh mục, Số lượng ≥ 1).'); return; }
@@ -217,12 +383,13 @@ function genTem(){
           '<div class="top"><span class="route">'+esc(route)+'</span><span class="thung">'+esc(it.dvt)+' '+bx.k+'/'+bx.n+'</span></div>'+
           '<hr class="divider">'+
           '<div class="qrwrap"><div class="qr"></div></div>'+
-          '<div class="sku">SKU: '+esc(it.s||it.g)+'</div>'+
+          (it.s?('<div class="sku">SKU: '+esc(it.s)+'</div>'):'')+
           '<div class="name'+(longName?' sm':'')+'">'+(it.en?esc(it.en):nameHtml(it.ten))+'</div>'+
           (it.en?('<div class="nameEn">'+nameHtml(it.ten)+'</div>'):'')+
           '<div class="qc">'+esc(it.qc||'')+'</div>'+
           (it.dt?('<div class="dt">Dung tích: '+esc(it.dt)+'</div>'):'')+
           (it.gc?('<div class="gc">Ghi chú: '+esc(it.gc)+'</div>'):'')+
+          '<div class="dt">Số lô SX:'+(it.lo?(' '+esc(it.lo)):' __________')+'</div>'+
           '<div class="hsd">HSD:'+(it.hsd?(' '+esc(fmtHSD(it.hsd))):'<span class="line"></span>')+'</div>'+
           '<div class="kien">Kiện '+g+'/'+M+'</div>'+
         '</div>';
@@ -230,9 +397,10 @@ function genTem(){
       new QRCode(tem.querySelector('.qr'), {text:(it.g||it.s||it.ten), width:160, height:160, correctLevel:QRCode.CorrectLevel.M});
     } else {
       var rowsHtml = bx.products.map(function(pr){
-        var meta='SKU: '+esc(pr.s||pr.g);
+        var meta=pr.s?('SKU: '+esc(pr.s)):('G SKU: '+esc(pr.g));
         if(pr.dt) meta+=' · '+esc(pr.dt);
-        if(pr.hsd) meta+=' · HSD '+esc(fmtHSD(pr.hsd));
+        meta+=' · Lô '+(pr.lo?esc(pr.lo):'______');
+        meta+=' · HSD '+(pr.hsd?esc(fmtHSD(pr.hsd)):'__________');
         if(pr.gc) meta+=' · '+esc(pr.gc);
         return '<div class="mixrow"><div class="mixqr" data-qr="'+esc(pr.g||pr.s||pr.ten)+'"></div><div class="mixL">'+
                  '<div class="mixname">'+nameHtml(pr.ten)+(pr.en?(' <span style="font-weight:600;color:#555">('+esc(pr.en)+')</span>'):'')+'</div>'+
