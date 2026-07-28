@@ -329,7 +329,7 @@ function fmtHSD(v){
 function genTem(){
   var src=document.getElementById('src').value.trim(), dst=document.getElementById('dst').value.trim();
   var route=(src&&dst)?(src+' → '+dst):(src||dst||'');
-  var trs=document.querySelectorAll('#rows tr'); var items=[]; var bad=[];
+  var trs=document.querySelectorAll('#rows tr'); var items=[]; var bad=[]; var miss=[];
   trs.forEach(function(tr){
     var ten=tr.querySelector('.c-ten').value.trim();
     var dvt=tr.querySelector('.c-dvt').value.trim()||'Thùng';
@@ -343,9 +343,11 @@ function genTem(){
     if(!ten||sl<=0) return;
     var m=MAP[norm(ten)];
     if(!m){ bad.push(ten); return; }
+    if(!lo || !hsd){ miss.push(m.t+(lo?'':' (thiếu Số lô)')+(hsd?'':' (thiếu HSD)')); return; }
     var isBox = /th[uùũ]ng/.test(norm(dvt));   // ĐVT = Thùng -> thùng nguyên
     items.push({ten:m.t, en:m.en||"", g:m.g, s:m.s, qc:qc, dt:dt, lo:lo, hsd:hsd, gc:gc, dvt:dvt, sl:sl, grp:grp, isBox:isBox});
   });
+  if(miss.length){ alert('⚠️ Phải điền đủ SỐ LÔ SX và HSD mới in được tem.\n\nCác mã còn thiếu:\n- '+miss.join('\n- ')); return; }
   if(bad.length){ if(!confirm('Các mã CHƯA khớp danh mục (sẽ bỏ qua):\n- '+bad.join('\n- ')+'\n\nTiếp tục in phần còn lại?')) return; }
   if(items.length===0){ alert('Chưa có dòng hợp lệ (Tên phải chọn trong danh mục, Số lượng ≥ 1).'); return; }
 
