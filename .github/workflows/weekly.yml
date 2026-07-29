@@ -1,0 +1,29 @@
+name: Báo cáo tuần (sáng Thứ 2)
+on:
+  schedule:
+    - cron: '0 1 * * 1'      # 01:00 UTC Thứ 2 = 08:00 sáng Thứ 2 (giờ VN)
+  workflow_dispatch:           # cho phép bấm chạy tay để test
+permissions:
+  contents: write
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Tao bao cao tuan
+        env:
+          LARK_APP_ID: ${{ secrets.LARK_APP_ID }}
+          LARK_APP_SECRET: ${{ secrets.LARK_APP_SECRET }}
+          LARK_APP_TOKEN: ${{ secrets.LARK_APP_TOKEN }}
+          LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK }}
+        run: python weekly_report.py
+      - name: Commit weekly_report.html
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add weekly_report.html
+          git commit -m "Cap nhat bao cao tuan" || echo "khong co thay doi"
+          git push
