@@ -165,7 +165,7 @@ def main():
         if not kalle_alert_ok(v['name'],v['hang']): continue
         r=rate(g)
         if r>0 and 0<v['ton']<r*30: risk.append({'name':v['name'],'rate':round(r,1),'ton':int(v['ton']),'days':round(v['ton']/r,1)})
-    risk=sorted(risk,key=lambda x:-x['rate'])[:12]
+    risk=sorted(risk,key=lambda x:x['days'])[:12]
     build_report({'range':rng,'cheng':chg,'kalle':kal,'risk':risk},is_month)
     tot_ch=sum(int(per[g]) for g in per if inv.get(g,{}).get('hang')=='Cheng')
     tot_ka=sum(int(per[g]) for g in per if inv.get(g,{}).get('hang')=='Kalle' and kalle_top_ok(inv.get(g,{}).get('name')))
