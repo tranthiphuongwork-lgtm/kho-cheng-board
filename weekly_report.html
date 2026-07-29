@@ -1,0 +1,53 @@
+<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Báo cáo bán hàng tuần 20/07–26/07/2026</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:#0f1729;color:#e6edf6;padding:18px;max-width:1100px;margin:0 auto}
+.head{background:linear-gradient(135deg,#0891b2,#7c3aed);border-radius:16px;padding:20px 24px;margin-bottom:18px}
+.head h1{font-size:22px;font-weight:800}.head .sub{opacity:.85;font-size:13px;margin-top:4px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+.card{background:#16203a;border:1px solid #243352;border-radius:14px;padding:16px}
+.card h2{font-size:15px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px}
+.tag.c{background:#155e75;color:#a5f3fc}.tag.k{background:#5b21b6;color:#ddd6fe}
+.row{margin-bottom:10px}
+.row .r1{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px}
+.row .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .rk{display:inline-block;width:20px;color:#7d8db0;font-weight:700}
+.row .qty{font-weight:800;font-size:14px}
+.row .tn{color:#7d8db0;font-size:11px;white-space:nowrap}
+.bar{height:6px;border-radius:6px;margin-top:4px;background:#243352;overflow:hidden}
+.bar>i{display:block;height:100%;border-radius:6px}
+.bc{background:linear-gradient(90deg,#06b6d4,#22d3ee)}.bk{background:linear-gradient(90deg,#8b5cf6,#a78bfa)}
+.risk h2{color:#fbbf24}
+.ri{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;background:#1b1430;border-left:4px solid #f59e0b;margin-bottom:8px}
+.ri.cr{border-color:#ef4444;background:#2a1320}.ri.wn{border-color:#f59e0b}.ri.ye{border-color:#eab308}
+.ri .nm{flex:1;font-size:13px;font-weight:600}
+.ri .meta{font-size:11px;color:#9fb0d0;text-align:right;white-space:nowrap}
+.ri .dd{font-weight:800;font-size:15px;text-align:center}
+.dd.cr{color:#f87171}.dd.wn{color:#fbbf24}.dd.ye{color:#fde047}
+.empty{color:#7d8db0;font-size:13px;padding:8px}
+.foot{text-align:center;color:#5b6b8c;font-size:11px;margin-top:16px}
+</style></head><body>
+<div class="head"><h1>📅 Báo cáo bán hàng TUẦN — Kho</h1><div class="sub">Tuần 20/07–26/07/2026 · Tổng bán cả tuần · Top bán chạy & cảnh báo sắp hết · tốc độ bán TB 2 tuần</div></div>
+<div class="grid">
+ <div class="card"><h2>🏆 Top bán chạy tuần <span class="tag c">CHENG · thuốc nhuộm</span></h2><div id="cheng"></div></div>
+ <div class="card"><h2>🏆 Top bán chạy tuần <span class="tag k">KALLE</span></h2><div id="kalle"></div></div>
+</div>
+<div class="card risk" style="margin-top:16px"><h2>⚠️ Sắp hết trong 1 tuần tới</h2><div class="empty" style="margin-bottom:6px">Tốc độ bán cao, tồn hiện không đủ bán 1 tuần — cần nhập thêm.</div><div id="risk"></div></div>
+<div class="foot">Báo cáo tuần tự động sáng Thứ 2 · Kho Cheng/Kalle</div>
+<script>
+var D={"range": "20/07–26/07/2026", "cheng": [{"name": "3 gói nhuộm bọt - trà lạnh (túi)", "qty": 1242, "ton": 5330, "rate": 203.9, "days": 26.1}, {"name": "Nâu trà lạnh - dưỡng ít + 6% (tuýp)", "qty": 1129, "ton": 6042, "rate": 186.4, "days": 32.4}, {"name": "Nâu đen - dưỡng ít + 3% (tuýp)", "qty": 1035, "ton": 16041, "rate": 167.9, "days": 95.5}, {"name": "Nâu tây lạnh - dưỡng ít + 9% (tuýp)", "qty": 869, "ton": 5098, "rate": 131.6, "days": 38.7}, {"name": "3 gói nhuộm bọt - nâu đen (túi)", "qty": 729, "ton": 3668, "rate": 101.9, "days": 36.0}, {"name": "Mocha - dưỡng ít + 9% (tuýp)", "qty": 642, "ton": 1593, "rate": 98.9, "days": 16.1}, {"name": "5 gói nhuộm bọt - trà lạnh (hộp)", "qty": 597, "ton": 3809, "rate": 103.0, "days": 37.0}, {"name": "Nâu lạnh - dưỡng ít + 9% (tuýp)", "qty": 597, "ton": 5611, "rate": 103.7, "days": 54.1}, {"name": "Chocolate - dưỡng ít + 6% (tuýp)", "qty": 579, "ton": 4003, "rate": 87.9, "days": 45.5}, {"name": "Nâu sữa - dưỡng ít + 9% (tuýp)", "qty": 528, "ton": 954, "rate": 103.3, "days": 9.2}], "kalle": [{"name": "Nước Hoa DARK BEAUTY - 10ML (lọ)", "qty": 171, "ton": 3216, "rate": 19.9, "days": 161.4}, {"name": "Box Dark Beauty 30ml + Sữa tắm Dark Beauty", "qty": 102, "ton": 527, "rate": 12.1, "days": 43.4}, {"name": "Nước Hoa DARK BEAUTY - 30ML (lọ)", "qty": 100, "ton": 238, "rate": 11.8, "days": 20.2}, {"name": "Box Dark Beauty 10ml + Sữa tắm Dark Beauty", "qty": 51, "ton": 843, "rate": 6.4, "days": 131.1}, {"name": "Nước Hoa Blue Shirt - 2ML (lọ)", "qty": 46, "ton": 1473, "rate": 5.5, "days": 267.8}, {"name": "Nước Hoa LADYKILLER - 10ML (lọ)", "qty": 46, "ton": 1124, "rate": 5.5, "days": 204.4}, {"name": "Nước Hoa LADYKILLER - 30ML (lọ)", "qty": 34, "ton": 164, "rate": 4.1, "days": 39.6}, {"name": "Sữa tắm Dark Beauty 500ml (chai)", "qty": 26, "ton": 24812, "rate": 3.0, "days": 8270.7}, {"name": "Nước Hoa LADYKILLER - 2ML (lọ)", "qty": 20, "ton": 2092, "rate": 2.5, "days": 836.8}, {"name": "Nước Hoa Blue Shirt - 10ML (lọ)", "qty": 18, "ton": 1265, "rate": 2.3, "days": 553.4}], "risk": [{"name": "Nâu tây - dưỡng ít + 9% (tuýp)", "rate": 31.4, "ton": 6, "days": 0.2}, {"name": "Nâu tây - dưỡng vừa (hộp)", "rate": 1.6, "ton": 2, "days": 1.2}]};
+function fmt(n){return n.toLocaleString('vi-VN')}
+function sellers(id,arr,cls){var el=document.getElementById(id);if(!arr.length){el.innerHTML='<div class=empty>Không có dữ liệu</div>';return}
+ var mx=Math.max.apply(null,arr.map(function(x){return x.qty}))||1;
+ el.innerHTML=arr.map(function(x,i){var w=Math.max(4,Math.round(x.qty/mx*100));
+  return '<div class=row><div class=r1><div class=nm><span class=rk>'+(i+1)+'</span>'+x.name+'</div><div class=qty>'+fmt(x.qty)+'</div></div>'+
+  '<div class=bar><i class="'+cls+'" style="width:'+w+'%"></i></div><div class=tn>tồn '+fmt(x.ton)+(x.days==null?' · đủ bán lâu':(x.days<0?' · <b style="color:#f87171">tồn âm</b>':' · đủ bán ~<b style="color:'+(x.days<7?'#f87171':(x.days<14?'#fbbf24':'#9fb0d0'))+'">'+x.days+' ngày</b>'))+'</div></div>'}).join('')}
+sellers('cheng',D.cheng,'bc');sellers('kalle',D.kalle,'bk');
+var rk=document.getElementById('risk');
+if(!D.risk.length){rk.innerHTML='<div class=empty>Không có mã nào dưới 1 tuần 🎉</div>'}else{
+ rk.innerHTML=D.risk.map(function(x){var c=x.days<2?'cr':(x.days<4?'wn':'ye');
+  return '<div class="ri '+c+'"><div class=nm>'+x.name+'</div><div class=meta>bán ~<b>'+fmt(x.rate)+'</b>/ngày · tồn <b>'+fmt(x.ton)+'</b></div><div class="dd '+c+'">'+x.days+'<div style="font-size:9px;font-weight:600;color:#9fb0d0">ngày</div></div></div>'}).join('')}
+</script></body></html>
