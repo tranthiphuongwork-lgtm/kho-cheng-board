@@ -89,7 +89,7 @@ body{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:#0f
  <div class="card"><h2>🏆 Top bán chạy __KIND4__ <span class="tag c">CHENG · thuốc nhuộm</span></h2><div id="cheng"></div></div>
  <div class="card"><h2>🏆 Top bán chạy __KIND4__ <span class="tag k">KALLE</span></h2><div id="kalle"></div></div>
 </div>
-<div class="card risk" style="margin-top:16px"><h2>⚠️ Sắp hết trong 1 tuần tới</h2><div class="empty" style="margin-bottom:6px">Tốc độ bán cao, tồn hiện không đủ bán 1 tuần — cần nhập thêm.</div><div id="risk"></div></div>
+<div class="card risk" style="margin-top:16px"><h2>⚠️ Sắp hết trong 1 tháng tới</h2><div class="empty" style="margin-bottom:6px">Tốc độ bán cao, tồn hiện không đủ bán 1 tháng — cần nhập thêm.</div><div id="risk"></div></div>
 <div class="foot">__FOOT__ · Kho Cheng/Kalle</div>
 <script>
 var D=__DATA__;
@@ -101,8 +101,8 @@ function sellers(id,arr,cls){var el=document.getElementById(id);if(!arr.length){
   '<div class=bar><i class="'+cls+'" style="width:'+w+'%"></i></div><div class=tn>tồn '+fmt(x.ton)+(x.days==null?' · đủ bán lâu':(x.days<0?' · <b style="color:#f87171">tồn âm</b>':' · đủ bán ~<b style="color:'+(x.days<7?'#f87171':(x.days<14?'#fbbf24':'#9fb0d0'))+'">'+x.days+' ngày</b>'))+'</div></div>'}).join('')}
 sellers('cheng',D.cheng,'bc');sellers('kalle',D.kalle,'bk');
 var rk=document.getElementById('risk');
-if(!D.risk.length){rk.innerHTML='<div class=empty>Không có mã nào dưới 1 tuần 🎉</div>'}else{
- rk.innerHTML=D.risk.map(function(x){var c=x.days<2?'cr':(x.days<4?'wn':'ye');
+if(!D.risk.length){rk.innerHTML='<div class=empty>Không có mã nào dưới 1 tháng 🎉</div>'}else{
+ rk.innerHTML=D.risk.map(function(x){var c=x.days<7?'cr':(x.days<14?'wn':'ye');
   return '<div class="ri '+c+'"><div class=nm>'+x.name+'</div><div class=meta>bán ~<b>'+fmt(x.rate)+'</b>/ngày · tồn <b>'+fmt(x.ton)+'</b></div><div class="dd '+c+'">'+x.days+'<div style="font-size:9px;font-weight:600;color:#9fb0d0">ngày</div></div></div>'}).join('')}
 </script></body></html>'''
 
@@ -164,8 +164,8 @@ def main():
         if g in TRIO or v.get('tb') or v['hang'] not in ('Cheng','Kalle') or v['pl']=='NVL': continue
         if not kalle_alert_ok(v['name'],v['hang']): continue
         r=rate(g)
-        if r>0 and 0<v['ton']<r*7: risk.append({'name':v['name'],'rate':round(r,1),'ton':int(v['ton']),'days':round(v['ton']/r,1)})
-    risk=sorted(risk,key=lambda x:-x['rate'])[:10]
+        if r>0 and 0<v['ton']<r*30: risk.append({'name':v['name'],'rate':round(r,1),'ton':int(v['ton']),'days':round(v['ton']/r,1)})
+    risk=sorted(risk,key=lambda x:-x['rate'])[:12]
     build_report({'range':rng,'cheng':chg,'kalle':kal,'risk':risk},is_month)
     tot_ch=sum(int(per[g]) for g in per if inv.get(g,{}).get('hang')=='Cheng')
     tot_ka=sum(int(per[g]) for g in per if inv.get(g,{}).get('hang')=='Kalle' and kalle_top_ok(inv.get(g,{}).get('name')))
@@ -175,7 +175,7 @@ def main():
     print(kind,rng,'| Cheng',tot_ch,'| Kalle',tot_ka,'| risk',len(risk))
     body=(f"**{('🗓️' if is_month else '📅')} Báo cáo bán hàng {kind} — {rng}**\n"
           f"Tổng bán {kind.lower()}: Cheng **{tot_ch:,}** · Kalle **{tot_ka:,}**.\n"
-          f"Kèm **{len(risk)} mã sắp hết trong 1 tuần**.\n\n👉 [Xem báo cáo {kind.lower()}]({url})")
+          f"Kèm **{len(risk)} mã sắp hết trong 1 tháng**.\n\n👉 [Xem báo cáo {kind.lower()}]({url})")
     card={'msg_type':'interactive','card':{'config':{'wide_screen_mode':True},
           'header':{'title':{'tag':'plain_text','content':('🗓️' if is_month else '📅')+' Báo cáo bán hàng '+kind.lower()},'template':('purple' if is_month else 'turquoise')},
           'elements':[{'tag':'div','text':{'tag':'lark_md','content':body}},
