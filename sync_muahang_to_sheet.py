@@ -1,13 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-Đồng bộ (mirror) 1 VIEW của Lark Base -> Lark Sheet. Ghi đè toàn bộ tab đích.
+Đồng bộ (mirror) 1 VIEW của Lark Base -> 1 tab bảng-tính-thường trong Lark Sheet.
 Nguồn : Base kế toán, bảng "Mua hàng", view vew3AfAswZ.
-Đích  : Lark Sheet SPOEss..., tab XMXeCH, bắt đầu A1 (hàng 1 = tên cột).
+Đích  : Lark Sheet SPOEss..., tab tên "Đồng bộ Mua hàng" (tự tạo lại mỗi lần -> mirror sạch).
 Cột   : Số ĐH · Ngày · Tên SP · Số nhập · Minh chứng · Ghi chú
 
-Chạy 1 lần khi bấm (workflow_dispatch). Cần secret: LARK_APP_ID, LARK_APP_SECRET.
-YÊU CẦU app: scope sheets:spreadsheet (đọc+ghi) + app được share Editor vào Sheet.
-Đặt DRY_RUN=1 để chỉ đọc Base và in ra, KHÔNG ghi Sheet.
+LƯU Ý: các tab kiểu Bitable (Sheet9, XMXeCH...) KHÔNG ghi được bằng API ô tính,
+nên script dùng một tab bảng-tính-thường riêng.
+
+Chạy 1 lần khi bấm (workflow_dispatch). Cần secret: LARK_APP_ID, LARK_APP_SECRET, LARK_APP_TOKEN.
+YÊU CẦU app: scope sheets:spreadsheet + được share Editor vào Sheet.
+DRY_RUN=1 để chỉ đọc Base và in ra, KHÔNG ghi Sheet.
 """
 import os, json, datetime, urllib.request, urllib.error
 
@@ -17,8 +20,8 @@ SEC=os.environ['LARK_APP_SECRET']
 BASE=os.environ['LARK_APP_TOKEN']
 SRC_TABLE='tblsSoY9HERffH6A'
 SRC_VIEW='vew3AfAswZ'
-SHEET_TOKEN='SPOEssCrjhROBDtn9YHlrQIWgtb'
-SHEET_TAB='XMXeCH'
+SHEET_TOKEN=os.environ.get('SHEET_TOKEN','SPOEssCrjhROBDtn9YHlrQIWgtb')
+SHEET_TAB_TITLE=os.environ.get('SHEET_TAB_TITLE','Đồng bộ Mua hàng')
 COLS=['Số ĐH','Ngày','Tên SP','Số nhập','Minh chứng','Ghi chú']
 DRY_RUN=(os.getenv('DRY_RUN') or '').strip() in ('1','true','yes')
 VN=datetime.timezone(datetime.timedelta(hours=7))
@@ -42,10 +45,9 @@ def api(t, method, path, body=None):
 
 
 def cell(v):
-    """Bitable field value -> giá trị phẳng cho Sheet."""
     if v is None: return ''
     if isinstance(v, dict):
-        if 'value' in v:  # formula/number
+        if 'value' in v:
             x=v['value']
             if isinstance(x, list): x=x[0] if x else ''
             return x
@@ -81,7 +83,7 @@ def read_view(t):
 
 
 def build_rows(items):
-    rows=[COLS[:]]  # header
+    rows=[COLS[:]]
     for it in items:
         f=it['fields']
         rows.append([
@@ -95,18 +97,6 @@ def build_rows(items):
     return rows
 
 
-def sheet_used_rows(t):
-    """Số hàng đang có dữ liệu ở cột A (để xoá phần dư khi mirror)."""
-    rng=f'{SHEET_TAB}!A1:A100000'
-    d=api(t,'GET',f'/open-apis/sheets/v2/spreadsheets/{SHEET_TOKEN}/values/{rng}')
-    if d.get('_http'): return None, d
-    vals=d.get('data',{}).get('valueRange',{}).get('values',[]) or []
-    n=0
-    for i,row in enumerate(vals):
-        if row and any(str(c).strip() for c in row): n=i+1
-    return n, None
-
-
 def col_letter(n):
     s=''
     while n>0:
@@ -114,22 +104,27 @@ def col_letter(n):
     return s
 
 
-def write_sheet(t, rows):
-    ncol=len(COLS); nrow=len(rows)
-    prev,err=sheet_used_rows(t)
-    if err: raise SystemExit('Đọc Sheet lỗi (kiểm tra quyền sheets:spreadsheet + share app vào Sheet): %s'%err)
-    # ghi dữ liệu mới
-    end=col_letter(ncol)
-    rng=f'{SHEET_TAB}!A1:{end}{nrow}'
+def ensure_fresh_tab(t):
+    """Xoá tab cùng tên nếu có, tạo lại mới -> trả sheetId (mirror luôn sạch)."""
+    meta=api(t,'GET',f'/open-apis/sheets/v2/spreadsheets/{SHEET_TOKEN}/metainfo')
+    if meta.get('_http'):
+        raise SystemExit('Không đọc được Sheet (kiểm tra scope sheets:spreadsheet + share app vào Sheet): %s'%meta)
+    for s in meta.get('data',{}).get('sheets',[]):
+        if s.get('title')==SHEET_TAB_TITLE:
+            api(t,'POST',f'/open-apis/sheets/v2/spreadsheets/{SHEET_TOKEN}/sheets_batch_update',
+                {'requests':[{'deleteSheet':{'sheetId':s.get('sheetId')}}]})
+    d=api(t,'POST',f'/open-apis/sheets/v2/spreadsheets/{SHEET_TOKEN}/sheets_batch_update',
+          {'requests':[{'addSheet':{'properties':{'title':SHEET_TAB_TITLE}}}]})
+    if d.get('_http'): raise SystemExit('Tạo tab lỗi: %s'%d)
+    return d['data']['replies'][0]['addSheet']['properties']['sheetId']
+
+
+def write_rows(t, tab_id, rows):
+    end=col_letter(len(COLS)); nrow=len(rows)
+    rng=f'{tab_id}!A1:{end}{nrow}'
     d=api(t,'PUT',f'/open-apis/sheets/v2/spreadsheets/{SHEET_TOKEN}/values',
           {'valueRange':{'range':rng,'values':rows}})
     if d.get('_http'): raise SystemExit('Ghi Sheet lỗi: %s'%d)
-    # xoá phần dư nếu lần trước nhiều hàng hơn
-    if prev and prev>nrow:
-        blanks=[['']*ncol for _ in range(prev-nrow)]
-        rng2=f'{SHEET_TAB}!A{nrow+1}:{end}{prev}'
-        api(t,'PUT',f'/open-apis/sheets/v2/spreadsheets/{SHEET_TOKEN}/values',
-            {'valueRange':{'range':rng2,'values':blanks}})
     return nrow-1
 
 
@@ -143,8 +138,9 @@ def main():
         print('  •', ' | '.join(str(x)[:22] for x in r))
     if DRY_RUN:
         print('\nDRY_RUN: chỉ đọc Base, KHÔNG ghi Sheet.'); return
-    n=write_sheet(t, rows)
-    print('\nĐã ghi %d dòng dữ liệu vào Sheet tab %s (mirror xong).'%(n, SHEET_TAB))
+    tab_id=ensure_fresh_tab(t)
+    n=write_rows(t, tab_id, rows)
+    print('\nĐã ghi %d dòng vào tab "%s" (id %s) — mirror xong.'%(n, SHEET_TAB_TITLE, tab_id))
 
 
 if __name__=='__main__':
