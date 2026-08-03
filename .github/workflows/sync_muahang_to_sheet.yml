@@ -1,5 +1,7 @@
 name: sync-muahang-to-sheet
 on:
+  schedule:
+    - cron: '0 1 * * *'      # 01:00 UTC = 08:00 sáng (giờ VN) mỗi ngày
   workflow_dispatch:
     inputs:
       dry_run:
