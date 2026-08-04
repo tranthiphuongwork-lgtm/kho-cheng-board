@@ -1,0 +1,29 @@
+name: condense-xuat-kho (nén tháng trước)
+on:
+  schedule:
+    - cron: '0 1 5 * *'      # 01:00 UTC ngày 5 = 08:00 sáng ngày 5 (giờ VN)
+  workflow_dispatch:
+    inputs:
+      month:
+        description: 'Nén tháng cụ thể YYYY-MM (trống = tháng liền trước)'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Chạy thử: chỉ xem, không sửa'
+        type: boolean
+        default: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Condense xuat kho
+        env:
+          LARK_APP_ID: ${{ secrets.LARK_APP_ID }}
+          LARK_APP_SECRET: ${{ secrets.LARK_APP_SECRET }}
+          LARK_APP_TOKEN: ${{ secrets.LARK_APP_TOKEN }}
+          MONTH: ${{ github.event.inputs.month }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: python condense_xk.py
