@@ -33,8 +33,7 @@ c2s = {r['code']: r.get('status') for r in wp}
 auco = defaultdict(float); ml2gb = defaultdict(float)
 for r in lines:
     if c2s.get(r['code']) == 499: continue          # bỏ đơn huỷ
-    if c2p.get(r['code']) == M.MLP: ml2gb[str(r['gsku'])] += r.get('quantity', 0)
-    else: auco[str(r['gsku'])] += r.get('quantity', 0)
+    auco[str(r['gsku'])] += r.get('quantity', 0)    # bỏ tách MLP: mọi đơn kho 32 = Âu Cơ
 
 # --- Mê Linh 2 từ báo cáo NVL ---
 s1a, s1b, s2 = M.parse_report(NGAY)
@@ -88,22 +87,34 @@ ex = [it['record_id'] for it in M.lsearch(ltok, M.T_XK, ['Ngày đóng gói', 'L
 for i in range(0, len(ex), 500):
     M.lpost(ltok, f'/open-apis/bitable/v1/apps/{M.BASE}/tables/{M.T_XK}/records/batch_delete',
             {'records': ex[i:i+500]})
+wrote_xk = 0
 for i in range(0, len(xk_recs), 500):
-    M.lpost(ltok, f'/open-apis/bitable/v1/apps/{M.BASE}/tables/{M.T_XK}/records/batch_create',
-            {'records': [{'fields': r} for r in xk_recs[i:i+500]]})
+    d = M.lpost(ltok, f'/open-apis/bitable/v1/apps/{M.BASE}/tables/{M.T_XK}/records/batch_create',
+                {'records': [{'fields': r} for r in xk_recs[i:i+500]]})
+    if d.get('code') != 0:
+        print('  !! LỖI ghi Xuất kho (batch từ %d): code=%s msg=%s' % (i, d.get('code'), d.get('msg')))
+        print('     chi tiết:', str(d)[:400])
+        print('     record mẫu:', xk_recs[i])
+    else:
+        wrote_xk += len(d.get('data', {}).get('records', []))
 
 exc = [it['record_id'] for it in M.lsearch(ltok, M.T_CK, ['Ngày', 'Loại nhập kho'])
        if it['fields'].get('Ngày') == DATE_MS and it['fields'].get('Loại nhập kho') == 'Nhập combo']
 for i in range(0, len(exc), 500):
     M.lpost(ltok, f'/open-apis/bitable/v1/apps/{M.BASE}/tables/{M.T_CK}/records/batch_delete',
             {'records': exc[i:i+500]})
+wrote_ck = 0
 for i in range(0, len(ck_recs), 500):
-    M.lpost(ltok, f'/open-apis/bitable/v1/apps/{M.BASE}/tables/{M.T_CK}/records/batch_create',
-            {'records': [{'fields': r} for r in ck_recs[i:i+500]]})
+    d = M.lpost(ltok, f'/open-apis/bitable/v1/apps/{M.BASE}/tables/{M.T_CK}/records/batch_create',
+                {'records': [{'fields': r} for r in ck_recs[i:i+500]]})
+    if d.get('code') != 0:
+        print('  !! LỖI ghi Chuyển kho combo: code=%s msg=%s' % (d.get('code'), d.get('msg')), str(d)[:300])
+    else:
+        wrote_ck += len(d.get('data', {}).get('records', []))
 
 tong = sum(r['Số lượng'] for r in xk_recs)
-print(f'>> XONG {NGAY}: Xuất kho {len(xk_recs)} dòng / {tong} sp (đã xoá {len(ex)} dòng cũ) '
-      f'| Nhập combo {len(ck_recs)} dòng | chưa map {len(unmapped)}')
+print(f'>> XONG {NGAY}: dựng {len(xk_recs)} dòng / {tong} sp — THỰC GHI {wrote_xk} dòng (đã xoá {len(ex)} cũ) '
+      f'| combo dựng {len(ck_recs)} ghi {wrote_ck} | chưa map {len(unmapped)}')
 if unmapped: print('  chưa map:', unmapped[:10])
 
 try:
