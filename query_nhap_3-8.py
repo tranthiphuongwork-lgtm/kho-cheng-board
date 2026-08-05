@@ -100,9 +100,34 @@ def main():
 
     _win=sum(len(v) for v in nhap_all.values())
     print('[debug] So ban ghi Mua hang roi vao ngay %s: %d dong, tong So nhap=%d'%(DATE,_win,int(sum(nhap.values()))))
+    # --- dinh nghia field 'Kho Me Linh 2' (formula hay so tay?) ---
+    fr=urllib.request.Request(H+f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_SP}/fields?page_size=200',
+        headers={'Authorization':'Bearer '+t})
+    fdef=json.load(urllib.request.urlopen(fr,timeout=30))['data']['items']
+    TYPE={1:'Text',2:'Number',3:'SingleSelect',5:'DateTime',19:'Lookup',20:'Formula',21:'DualLink',22:'Location',23:'GroupChat'}
+    print('== DINH NGHIA FIELD TON KHO ==')
+    for it in fdef:
+        if it['field_name'] in ('Kho Mê Linh 2','Tồn kho Âu Cơ','Kho Mê Linh 1'):
+            ty=TYPE.get(it['type'],it['type'])
+            fx=''
+            pr=it.get('property') or {}
+            if isinstance(pr,dict): fx=pr.get('formatter') or pr.get('formula_expression') or pr.get('expression') or ''
+            print('  • %-16s type=%-8s %s'%(it['field_name'],ty,('formula: '+str(fx)) if fx else ('property='+str(pr)[:160])))
+    # --- chuyen kho Me Linh 2 -> Au Co (T_CK) ---
+    ck=lsearch(t,T_CK,['Ngày','Tên SP','Số lượng','Kho xuất','Kho nhập'])
+    cve=defaultdict(float); cve_all=defaultdict(float)
+    for it in ck:
+        f=it['fields']
+        kx=norm(gt(f.get('Kho xuất'))); kn=norm(gt(f.get('Kho nhập')))
+        if 'mê linh 2' not in kx and 'ml2' not in kx: continue
+        if 'âu cơ' not in kn and 'au co' not in kn: continue
+        nm=norm(gt(f.get('Tên SP'))); q=fv(f.get('Số lượng')); dd=f.get('Ngày')
+        cve_all[nm]+=q
+        if isinstance(dd,(int,float)) and dd>=LO: cve[nm]+=q
+    print()
     print('== SO LIEU cho bai toan THUC NHAN lo nhap %s -> Kho Me Linh 2 =='%DATE)
-    print('Cot: | Ten SP (danh sach) | Match Base | GSKU | Ghi so nhap 3/8 (C) | Ton ML2 hien tai (G) | Xuat tu 3/8->nay |')
-    print('-'*120)
+    print('Cot: | Ten SP | GSKU | Ghi so nhap 3/8 | Ton ML2 hien tai | Xuat ML2 tu 3/8 | Chuyen di AuCo tu 3/8 |')
+    print('-'*118)
     for name in DANH_SACH:
         n=norm(name)
         rec=by_name.get(n)
@@ -119,11 +144,16 @@ def main():
             for k,v in nhap.items():
                 if n in k or k in n: c=int(v); break
         x = int(xuat.get(g,0)) if g else ''
-        print('| %-42s | %-38s | %-6s | %8s | %8s | %8s |'%(name, mname[:38], g, c, ml2, x))
-    print('-'*120)
-    print('GHI CHU: "Ghi so nhap 3/8" = tong "So nhap" o bang Mua hang ngay 3/8.')
-    print('         "Ton ML2 hien tai" = field "Kho Me Linh 2" bang San pham (tai thoi diem chay).')
-    print('         Thuc nhan = Ghi so 3/8 + (Ton kiem lai - Ton ML2 hien tai).')
+        cv = int(cve.get(n,0))
+        if cv==0:
+            for k,vv in cve.items():
+                if n in k or k in n: cv=int(vv); break
+        print('| %-40s | %-6s | %8s | %8s | %8s | %8s |'%(name[:40], g, c, ml2, x, cv))
+    print('-'*118)
+    print('GHI CHU: "Ghi so nhap 3/8" = tong "So nhap" bang Mua hang ngay 3/8.')
+    print('         "Ton ML2 hien tai" = field "Kho Me Linh 2" bang San pham (luc chay).')
+    print('         "Chuyen di AuCo tu 3/8" = chuyen kho Me Linh 2 -> Au Co tu 3/8 (bang Chuyen kho).')
+    print('         Neu field ML2 la Formula co tru chuyen kho -> ton ML2 DA tru phan chuyen di.')
 
 if __name__=='__main__':
     main()
