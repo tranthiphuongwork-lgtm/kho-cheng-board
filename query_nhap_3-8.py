@@ -90,80 +90,93 @@ def main():
         if not isinstance(dd,(int,float)) or not (LO<=dd<=HI): continue
         nm=gt(f.get('Tên SP')); q=fv(f.get('Số nhập'))
         nhap[norm(nm)]+=q; nhap_all[norm(nm)].append((nm,q,gt(f.get('Số ĐH'))))
-    # --- xuat tu 3/8 -> nay theo GSKU (tham khao) ---
-    now_ms=int(datetime.datetime.now(VN).timestamp()*1000)
-    xk=lsearch(t,T_XK,['G SKU','Số lượng','Kho xuất','Ngày đóng gói'])
-    xuat=defaultdict(float)
-    for it in xk:
-        f=it['fields']; dd=f.get('Ngày đóng gói')
-        if not isinstance(dd,(int,float)) or dd<LO: continue
-        if 'mê linh 2' not in norm(gt(f.get('Kho xuất'))): continue
-        xuat[gt(f.get('G SKU'))]+=fv(f.get('Số lượng'))
-
     _win=sum(len(v) for v in nhap_all.values())
     print('[debug] So ban ghi Mua hang roi vao ngay %s: %d dong, tong So nhap=%d'%(DATE,_win,int(sum(nhap.values()))))
-    # --- dinh nghia field 'Kho Me Linh 2' (formula hay so tay?) ---
-    fr=urllib.request.Request(H+f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_SP}/fields?page_size=200',
-        headers={'Authorization':'Bearer '+t})
-    fdef=json.load(urllib.request.urlopen(fr,timeout=30))['data']['items']
-    TYPE={1:'Text',2:'Number',3:'SingleSelect',5:'DateTime',19:'Lookup',20:'Formula',21:'DualLink',22:'Location',23:'GroupChat'}
-    print('== DINH NGHIA FIELD TON KHO ==')
-    for it in fdef:
-        if it['field_name'] in ('Kho Mê Linh 2','Tồn kho Âu Cơ','Kho Mê Linh 1'):
-            ty=TYPE.get(it['type'],it['type'])
-            fx=''
-            pr=it.get('property') or {}
-            if isinstance(pr,dict): fx=pr.get('formatter') or pr.get('formula_expression') or pr.get('expression') or ''
-            print('  • %-16s type=%-8s %s'%(it['field_name'],ty,('formula: '+str(fx)) if fx else ('property='+str(pr)[:160])))
-    # --- chuyen kho Me Linh 2 -> Au Co (T_CK) ---
+
+    def bucket(dd):
+        if not isinstance(dd,(int,float)): return None
+        if dd<LO: return 'b'      # truoc 3/8
+        if dd<=HI: return 'in'    # trong ngay 3/8 (chinh la lo)
+        return 'af'               # sau 3/8
+    def dfmt(ms):
+        return datetime.datetime.fromtimestamp(ms/1000,VN).strftime('%Y-%m-%d') if ms else '?'
+
+    # --- Mua hang (nhap) theo Ten SP, chia truoc / lo 3/8 / sau ---
+    mh_b=defaultdict(float); mh_in=defaultdict(float); mh_af=defaultdict(float); mh_min=None
+    for it in mh:
+        f=it['fields']; dd=f.get('Ngày'); bk=bucket(dd)
+        if bk is None: continue
+        if mh_min is None or dd<mh_min: mh_min=dd
+        n=norm(gt(f.get('Tên SP'))); q=fv(f.get('Số nhập'))
+        (mh_b if bk=='b' else mh_in if bk=='in' else mh_af)[n]+=q
+    # --- Xuat khoi ML2 (ban+gia cong) theo GSKU ---
+    xk=lsearch(t,T_XK,['G SKU','Số lượng','Kho xuất','Ngày đóng gói'])
+    xk_b=defaultdict(float); xk_af=defaultdict(float); xk_min=None
+    for it in xk:
+        f=it['fields']; dd=f.get('Ngày đóng gói')
+        if 'mê linh 2' not in norm(gt(f.get('Kho xuất'))): continue
+        bk=bucket(dd)
+        if bk is None: continue
+        if xk_min is None or dd<xk_min: xk_min=dd
+        g=gt(f.get('G SKU')); q=fv(f.get('Số lượng'))
+        (xk_b if bk=='b' else xk_af)[g]+=q   # 'in'+'af' deu tinh la sau khi nhan
+    # --- Chuyen kho lien quan ML2 theo Ten SP ---
     ck=lsearch(t,T_CK,['Ngày','Tên SP','Số lượng','Kho xuất','Kho nhập'])
-    cve=defaultdict(float); cve_all=defaultdict(float)
+    cv_b=defaultdict(float); cv_af=defaultdict(float)   # chuyen VE ML2
+    cd_b=defaultdict(float); cd_af=defaultdict(float)   # chuyen DI khoi ML2
     for it in ck:
-        f=it['fields']
+        f=it['fields']; dd=f.get('Ngày'); bk=bucket(dd)
+        if bk is None: continue
         kx=norm(gt(f.get('Kho xuất'))); kn=norm(gt(f.get('Kho nhập')))
-        if 'mê linh 2' not in kx and 'ml2' not in kx: continue
-        if 'âu cơ' not in kn and 'au co' not in kn: continue
-        nm=norm(gt(f.get('Tên SP'))); q=fv(f.get('Số lượng')); dd=f.get('Ngày')
-        cve_all[nm]+=q
-        if isinstance(dd,(int,float)) and dd>=LO: cve[nm]+=q
-    # --- so kiem lai thuc te (thung, cai le) theo GSKU ---
+        n=norm(gt(f.get('Tên SP'))); q=fv(f.get('Số lượng'))
+        if 'mê linh 2' in kn or 'ml2' in kn: (cv_b if bk=='b' else cv_af)[n]+=q
+        if 'mê linh 2' in kx or 'ml2' in kx: (cd_b if bk=='b' else cd_af)[n]+=q
+
+    def gv(d,n):
+        if n in d: return d[n]
+        for k,v in d.items():
+            if n and (n in k or k in n): return v
+        return 0.0
+
     RECOUNT={
      '1082863':(61,300),'1082893':(120,393),'1082845':(52,330),'1082884':(135,402),
      '1082896':(31,200),'1082872':(185,392),'1082878':(31,473),'1082881':(214,423),
      '1082883':(22,236),'1082871':(27,239),
      '1082870':(42,225),'1082894':(49,66),'1082867':(33,88),'1082879':(93,151),
     }
+    QC=48
     print()
-    print('== KET QUA THUC NHAN lo nhap %s -> Kho Me Linh 2 =='%DATE)
-    print('| Ten SP | GSKU | QuyCach | Thung | Cai le | Ton kiem lai | Ghi so 3/8 | Ton ML2 htai | THUC NHAN | Dem sai |')
-    print('-'*140)
-    tot={'c':0,'kl':0,'tn':0}
+    print('== DUNG LAI TON TRUOC 3/8 + THUC NHAN (theo luong nhap-xuat, KHONG dung ton Lookup) ==')
+    print('  Du lieu Mua hang som nhat: %s | Xuat ML2 som nhat: %s'%(dfmt(mh_min),dfmt(xk_min)))
+    print('  (Ton truoc 3/8 chi dung neu truoc moc nay ML2 = 0)')
+    print('-'*146)
+    print('| Ten SP | GSKU | Ton kiem lai | Ton truoc 3/8 | Xuat sau 3/8 | Nhap khac sau | Ghi so lo 3/8 | THUC NHAN | Chenh vs ghi so |')
+    print('-'*146)
+    T={'kl':0,'tt':0,'xa':0,'na':0,'gs':0,'tn':0}
     for name in DANH_SACH:
         n=norm(name); rec=by_name.get(n)
         if not rec:
-            cand=[v for k,v in by_name.items() if n in k or k in n]
-            rec=cand[0] if len(cand)==1 else None
-        g = rec['g'] if rec else ''
-        ml2 = int(rec['ml2']) if rec else 0
-        qc = int(rec['qc']) if rec else 0
-        c = int(nhap.get(n,0))
-        if c==0:
-            for k,v in nhap.items():
-                if n in k or k in n: c=int(v); break
-        th,cai = RECOUNT.get(g,(0,0))
-        kl = th*qc + cai
-        tn = c + (kl - ml2)
-        ds = kl - ml2
-        tot['c']+=c; tot['kl']+=kl; tot['tn']+=tn
-        print('| %-38s | %-7s | %5s | %5s | %5s | %10s | %9s | %10s | %9s | %7s |'%(
-              name[:38], g, qc, th, cai, kl, c, ml2, tn, ds))
-    print('-'*140)
-    print('| %-38s | %-7s | %5s | %5s | %5s | %10s | %9s | %10s | %9s | %7s |'%(
-          'TONG','','','','',tot['kl'],tot['c'],'',tot['tn'],''))
+            cand=[v for k,v in by_name.items() if n in k or k in n]; rec=cand[0] if len(cand)==1 else None
+        g=rec['g'] if rec else ''
+        th,cai=RECOUNT.get(g,(0,0)); kl=th*QC+cai
+        nb=gv(mh_b,n); nin=gv(mh_in,n); naf=gv(mh_af,n)
+        cvb=gv(cv_b,n); cvaf=gv(cv_af,n); cdb=gv(cd_b,n); cdaf=gv(cd_af,n)
+        xb=xk_b.get(g,0); xaf=xk_af.get(g,0)
+        ton_truoc = nb + cvb - xb - cdb
+        xuat_after = xaf + cdaf
+        nhap_khac_after = naf + cvaf
+        tn = kl - ton_truoc + xuat_after - nhap_khac_after
+        ch = tn - nin
+        for k,vv in (('kl',kl),('tt',ton_truoc),('xa',xuat_after),('na',nhap_khac_after),('gs',nin),('tn',tn)): T[k]+=vv
+        print('| %-36s | %-7s | %10d | %11d | %10d | %11d | %11d | %9d | %11d |'%(
+              name[:36], g, kl, ton_truoc, xuat_after, nhap_khac_after, nin, tn, ch))
+    print('-'*146)
+    print('| %-36s | %-7s | %10d | %11d | %10d | %11d | %11d | %9d | %11d |'%(
+          'TONG','',T['kl'],T['tt'],T['xa'],T['na'],T['gs'],T['tn'],T['tn']-T['gs']))
     print()
-    print('CT: Ton kiem lai (cai) = Thung x QuyCach + Cai le.')
-    print('    THUC NHAN = Ghi so 3/8 + (Ton kiem lai - Ton ML2 hien tai).')
-    print('    Dem sai   = Ton kiem lai - Ton ML2 (duong = dem thieu / thuc nhan nhieu hon ghi so).')
+    print('CT: THUC NHAN = Ton kiem lai - Ton truoc 3/8 + Xuat sau 3/8 - Nhap khac sau 3/8')
+    print('    Ton truoc 3/8 = Mua hang truoc + Chuyen ve ML2 truoc - Xuat ML2 truoc - Chuyen di truoc (goc 0).')
+    print('    "Ghi so lo 3/8" = So nhap da ghi ngay 3/8 (de doi chieu). Chenh = THUC NHAN - Ghi so.')
 
 if __name__=='__main__':
     main()
