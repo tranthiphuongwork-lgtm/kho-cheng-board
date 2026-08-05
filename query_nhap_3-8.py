@@ -12,7 +12,7 @@ from collections import defaultdict
 
 H='https://open.larksuite.com'
 APP=os.environ['LARK_APP_ID']; SEC=os.environ['LARK_APP_SECRET']; BASE=os.environ['LARK_APP_TOKEN']
-T_SP='tbl7PSQh3Lq5Tlxy'; T_XK='tblIHtLsM4QTMMQJ'; T_CK='tblylArl4EL4AvrX'
+T_SP='tbl7PSQh3Lq5Tlxy'; T_XK='tblIHtLsM4QTMMQJ'; T_CK='tblylArl4EL4AvrX'; T_MH='tblsSoY9HERffH6A'
 VN=datetime.timezone(datetime.timedelta(hours=7))
 DATE=os.getenv('QUERY_DATE','2026-08-03').strip()
 d0=datetime.datetime.strptime(DATE,'%Y-%m-%d').replace(tzinfo=VN)
@@ -80,16 +80,14 @@ def main():
     for it in sp:
         f=it['fields']; nm=gt(f.get('Tên sản phẩm'))
         if nm: by_name[norm(nm)]={'name':nm,'g':gt(f.get('G SKU')),'ml2':fv(f.get('Kho Mê Linh 2'))}
-    # --- nhap 3/8 tu T_CK (theo ten SP, kho nhap ML2) ---
-    ck=lsearch(t,T_CK,['Ngày','Loại nhập kho','Tên SP','Số lượng','Kho nhập'])
+    # --- nhap 3/8 tu T_MH (bang Mua hang, field 'So nhap') ---
+    mh=lsearch(t,T_MH,['Số ĐH','Ngày','Tên SP','Số nhập','Ghi chú'])
     nhap=defaultdict(float); nhap_all=defaultdict(list)
-    for it in ck:
+    for it in mh:
         f=it['fields']; dd=f.get('Ngày')
         if not isinstance(dd,(int,float)) or not (LO<=dd<=HI): continue
-        kn=gt(f.get('Kho nhập'))
-        if 'mê linh 2' not in norm(kn) and 'ml2' not in norm(kn): continue
-        nm=gt(f.get('Tên SP')); q=fv(f.get('Số lượng'))
-        nhap[norm(nm)]+=q; nhap_all[norm(nm)].append((nm,q,gt(f.get('Loại nhập kho'))))
+        nm=gt(f.get('Tên SP')); q=fv(f.get('Số nhập'))
+        nhap[norm(nm)]+=q; nhap_all[norm(nm)].append((nm,q,gt(f.get('Số ĐH'))))
     # --- xuat tu 3/8 -> nay theo GSKU (tham khao) ---
     now_ms=int(datetime.datetime.now(VN).timestamp()*1000)
     xk=lsearch(t,T_XK,['G SKU','Số lượng','Kho xuất','Ngày đóng gói'])
@@ -100,6 +98,8 @@ def main():
         if 'mê linh 2' not in norm(gt(f.get('Kho xuất'))): continue
         xuat[gt(f.get('G SKU'))]+=fv(f.get('Số lượng'))
 
+    _win=sum(len(v) for v in nhap_all.values())
+    print('[debug] So ban ghi Mua hang roi vao ngay %s: %d dong, tong So nhap=%d'%(DATE,_win,int(sum(nhap.values()))))
     print('== SO LIEU cho bai toan THUC NHAN lo nhap %s -> Kho Me Linh 2 =='%DATE)
     print('Cot: | Ten SP (danh sach) | Match Base | GSKU | Ghi so nhap 3/8 (C) | Ton ML2 hien tai (G) | Xuat tu 3/8->nay |')
     print('-'*120)
@@ -121,7 +121,7 @@ def main():
         x = int(xuat.get(g,0)) if g else ''
         print('| %-42s | %-38s | %-6s | %8s | %8s | %8s |'%(name, mname[:38], g, c, ml2, x))
     print('-'*120)
-    print('GHI CHU: "Ghi so nhap 3/8" = tong So luong ghi vao bang Nhap/Chuyen kho ngay 3/8, kho nhap Me Linh 2.')
+    print('GHI CHU: "Ghi so nhap 3/8" = tong "So nhap" o bang Mua hang ngay 3/8.')
     print('         "Ton ML2 hien tai" = field "Kho Me Linh 2" bang San pham (tai thoi diem chay).')
     print('         Thuc nhan = Ghi so 3/8 + (Ton kiem lai - Ton ML2 hien tai).')
 
