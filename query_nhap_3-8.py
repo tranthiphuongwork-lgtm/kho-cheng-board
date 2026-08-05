@@ -74,12 +74,14 @@ def norm(s):
 
 def main():
     t=tok()
-    # --- ton he thong tu T_SP ---
-    sp=lsearch(t,T_SP,['G SKU','Tên sản phẩm','Kho Mê Linh 2'])
-    by_name={}
+    # --- ton he thong + quy cach tu T_SP ---
+    sp=lsearch(t,T_SP,['G SKU','Tên sản phẩm','Kho Mê Linh 2','Quy cách'])
+    by_name={}; by_g={}
     for it in sp:
         f=it['fields']; nm=gt(f.get('Tên sản phẩm'))
-        if nm: by_name[norm(nm)]={'name':nm,'g':gt(f.get('G SKU')),'ml2':fv(f.get('Kho Mê Linh 2'))}
+        rec={'name':nm,'g':gt(f.get('G SKU')),'ml2':fv(f.get('Kho Mê Linh 2')),'qc':fv(f.get('Quy cách'))}
+        if nm: by_name[norm(nm)]=rec
+        if rec['g']: by_g[rec['g']]=rec
     # --- nhap 3/8 tu T_MH (bang Mua hang, field 'So nhap') ---
     mh=lsearch(t,T_MH,['Số ĐH','Ngày','Tên SP','Số nhập','Ghi chú'])
     nhap=defaultdict(float); nhap_all=defaultdict(list)
@@ -124,36 +126,44 @@ def main():
         nm=norm(gt(f.get('Tên SP'))); q=fv(f.get('Số lượng')); dd=f.get('Ngày')
         cve_all[nm]+=q
         if isinstance(dd,(int,float)) and dd>=LO: cve[nm]+=q
+    # --- so kiem lai thuc te (thung, cai le) theo GSKU ---
+    RECOUNT={
+     '1082863':(61,300),'1082893':(120,393),'1082845':(52,330),'1082884':(135,402),
+     '1082896':(31,200),'1082872':(185,392),'1082878':(31,473),'1082881':(214,423),
+     '1082883':(22,236),'1082871':(27,239),
+     '1082870':(42,225),'1082894':(49,66),'1082867':(33,88),'1082879':(93,151),
+    }
     print()
-    print('== SO LIEU cho bai toan THUC NHAN lo nhap %s -> Kho Me Linh 2 =='%DATE)
-    print('Cot: | Ten SP | GSKU | Ghi so nhap 3/8 | Ton ML2 hien tai | Xuat ML2 tu 3/8 | Chuyen di AuCo tu 3/8 |')
-    print('-'*118)
+    print('== KET QUA THUC NHAN lo nhap %s -> Kho Me Linh 2 =='%DATE)
+    print('| Ten SP | GSKU | QuyCach | Thung | Cai le | Ton kiem lai | Ghi so 3/8 | Ton ML2 htai | THUC NHAN | Dem sai |')
+    print('-'*140)
+    tot={'c':0,'kl':0,'tn':0}
     for name in DANH_SACH:
-        n=norm(name)
-        rec=by_name.get(n)
-        # fuzzy neu khong khop chinh xac
+        n=norm(name); rec=by_name.get(n)
         if not rec:
             cand=[v for k,v in by_name.items() if n in k or k in n]
             rec=cand[0] if len(cand)==1 else None
         g = rec['g'] if rec else ''
-        ml2 = int(rec['ml2']) if rec else ''
-        mname = rec['name'] if rec else '❌ KHONG KHOP'
+        ml2 = int(rec['ml2']) if rec else 0
+        qc = int(rec['qc']) if rec else 0
         c = int(nhap.get(n,0))
-        # neu ten trong T_CK khac, thu match qua nhap_all keys
         if c==0:
             for k,v in nhap.items():
                 if n in k or k in n: c=int(v); break
-        x = int(xuat.get(g,0)) if g else ''
-        cv = int(cve.get(n,0))
-        if cv==0:
-            for k,vv in cve.items():
-                if n in k or k in n: cv=int(vv); break
-        print('| %-40s | %-6s | %8s | %8s | %8s | %8s |'%(name[:40], g, c, ml2, x, cv))
-    print('-'*118)
-    print('GHI CHU: "Ghi so nhap 3/8" = tong "So nhap" bang Mua hang ngay 3/8.')
-    print('         "Ton ML2 hien tai" = field "Kho Me Linh 2" bang San pham (luc chay).')
-    print('         "Chuyen di AuCo tu 3/8" = chuyen kho Me Linh 2 -> Au Co tu 3/8 (bang Chuyen kho).')
-    print('         Neu field ML2 la Formula co tru chuyen kho -> ton ML2 DA tru phan chuyen di.')
+        th,cai = RECOUNT.get(g,(0,0))
+        kl = th*qc + cai
+        tn = c + (kl - ml2)
+        ds = kl - ml2
+        tot['c']+=c; tot['kl']+=kl; tot['tn']+=tn
+        print('| %-38s | %-7s | %5s | %5s | %5s | %10s | %9s | %10s | %9s | %7s |'%(
+              name[:38], g, qc, th, cai, kl, c, ml2, tn, ds))
+    print('-'*140)
+    print('| %-38s | %-7s | %5s | %5s | %5s | %10s | %9s | %10s | %9s | %7s |'%(
+          'TONG','','','','',tot['kl'],tot['c'],'',tot['tn'],''))
+    print()
+    print('CT: Ton kiem lai (cai) = Thung x QuyCach + Cai le.')
+    print('    THUC NHAN = Ghi so 3/8 + (Ton kiem lai - Ton ML2 hien tai).')
+    print('    Dem sai   = Ton kiem lai - Ton ML2 (duong = dem thieu / thuc nhan nhieu hon ghi so).')
 
 if __name__=='__main__':
     main()
