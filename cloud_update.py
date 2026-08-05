@@ -34,7 +34,14 @@ def fv(v):
     except: return 0
 def lpost(tok,path,body):
     r=urllib.request.Request(LARK_HOST+path,data=json.dumps(body).encode(),headers={'Authorization':'Bearer '+tok,'Content-Type':'application/json'},method='POST')
-    return json.load(urllib.request.urlopen(r,timeout=60))
+    d=json.load(urllib.request.urlopen(r,timeout=60))
+    if isinstance(d,dict) and d.get('code') not in (0,None):
+        msg='LARK API LỖI: code=%s msg=%s path=%s'%(d.get('code'),d.get('msg'),path[:90])
+        print('  !! '+msg)
+        # Lỗi khi GHI/XOÁ -> raise cho workflow đỏ (tránh âm thầm mất data như vụ đầy bảng)
+        if any(k in path for k in ('batch_create','batch_delete','batch_update')):
+            raise RuntimeError(msg)
+    return d
 def lsearch(tok,tid,fields):
     out=[];pt=None
     while True:
@@ -220,11 +227,12 @@ def compute(tok):
         f=it['fields'];g=gt(f.get('G SKU'))
         if not g: continue
         inv[str(g)]={'name':gt(f.get('Tên sản phẩm')),'cat':gt(f.get('Phân loại')) or '','hang':(gt(f.get('Hãng')) or '—').strip() or '—','qc':fv(f.get('Quy cách')),'ve':fv(f.get('Hàng dự kiến về')),'ac':fv(f.get('Tồn kho Âu Cơ')),'ml1':fv(f.get('Kho Mê Linh 1')),'ml2':fv(f.get('Kho Mê Linh 2'))}
-    xk=lsearch(tok,T_XK,['G SKU','Số lượng','Kho xuất','Ngày đóng gói'])
+    xk=lsearch(tok,T_XK,['G SKU','Số lượng','Kho xuất','Ngày đóng gói','Loại'])
     salesw=defaultdict(lambda:defaultdict(float));days=set();now=datetime.datetime.now().timestamp()*1000;q7=defaultdict(float)
     for it in xk:
         f=it['fields'];g=gt(f.get('G SKU'));q=f.get('Số lượng') or 0;k=f.get('Kho xuất');d=f.get('Ngày đóng gói')
         if isinstance(d,(int,float)): days.add(d)
+        if (gt(f.get('Loại')) or '').strip()!='Xuất Bán hàng': continue   # CHỈ tính hàng bán cho tốc độ xuất (bỏ chuyển kho/gia công/đóng box)
         if g and k: salesw[g][k]+=q
         if g and isinstance(d,(int,float)) and (now-d)<=7*86400*1000: q7[g]+=q
     NDW=max(1,len(days));NDM=31
@@ -364,9 +372,10 @@ def send_day_reports(tok,ngay):
         inv[str(g)]={'name':gt(f.get('Tên sản phẩm')) or g,'hang':(gt(f.get('Hãng')) or '—').strip(),'pl':(gt(f.get('Phân loại')) or '').strip(),'ton':fv(f.get('Tồn kho Âu Cơ'))+fv(f.get('Kho Mê Linh 1'))+fv(f.get('Kho Mê Linh 2')),'tb':bool(f.get('Thông báo hết hàng'))}
     from collections import defaultdict as _dd
     day=_dd(float);s14=_dd(float)
-    for it in lsearch(tok,T_XK,['G SKU','Số lượng','Ngày đóng gói']):
+    for it in lsearch(tok,T_XK,['G SKU','Số lượng','Ngày đóng gói','Loại']):
         f=it['fields'];g=gt(f.get('G SKU'));q=f.get('Số lượng') or 0;dt=f.get('Ngày đóng gói')
         if not g or not isinstance(dt,(int,float)): continue
+        if (gt(f.get('Loại')) or '').strip()!='Xuất Bán hàng': continue   # CHỈ tính hàng bán; bỏ Xuất lưu kho/Gia công/Đóng Box
         g=str(g)
         if dt==DATE_MS: day[g]+=q
         dd=(DATE_MS-dt)/86400000
