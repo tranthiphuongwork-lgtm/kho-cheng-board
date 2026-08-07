@@ -118,6 +118,22 @@
     </div>
   </div>
 
+  <div class="cfg">
+    <label style="flex:1;min-width:200px">Thêm sản phẩm vào danh mục — Tên
+      <input id="sp_ten" placeholder="Tên sản phẩm mới...">
+    </label>
+    <label>Mã GSKU (cho QR)
+      <input id="sp_ma" placeholder="vd 1082884">
+    </label>
+    <label>Quy cách
+      <input id="sp_qc" placeholder="vd 50 hộp/thùng">
+    </label>
+    <div class="khman" style="margin-left:0">
+      <button type="button" class="kadd" onclick="addProduct()">➕ Thêm SP</button>
+      <button type="button" class="kdel" onclick="delProduct()" title="Xóa SP tự thêm (gõ đúng tên vào ô Tên)">✕ Xóa SP</button>
+    </div>
+  </div>
+
   <datalist id="prods"></datalist>
 
   <table>
@@ -160,7 +176,7 @@ function norm(s){return (s||'').replace(/\s+/g,' ').trim().toLowerCase();}
 var MAP = {};
 function applyCatalog(){
   var s=document.getElementById('src').value.trim();
-  CATALOG = (s==='Sài Gòn') ? CATALOG_SG : CATALOG_FULL;
+  CATALOG = ((s==='Sài Gòn') ? CATALOG_SG : CATALOG_FULL).concat(CUSTOM);
   MAP = {};
   CATALOG.forEach(function(c){ MAP[norm(c.t)] = c; });
   var dl=document.getElementById('prods'); dl.innerHTML='';
@@ -208,6 +224,35 @@ function delKho(){
 function togglePhieu(){
   var s=document.getElementById('src').value.trim();
   document.getElementById('btnPhieu').style.display=(s && s!=='Sài Gòn')?'':'none';
+}
+
+/* ====== Sản phẩm tự thêm (lưu localStorage, vào cả 2 danh mục) ====== */
+function loadCustom(){
+  try{ var s=JSON.parse(localStorage.getItem('customProds')); if(Array.isArray(s)) return s; }catch(e){}
+  return [];
+}
+function saveCustom(){ try{ localStorage.setItem('customProds', JSON.stringify(CUSTOM)); }catch(e){} }
+var CUSTOM = loadCustom();
+function addProduct(){
+  var t=document.getElementById('sp_ten').value.trim();
+  var g=document.getElementById('sp_ma').value.trim();
+  var qc=document.getElementById('sp_qc').value.trim();
+  if(!t){ alert('Nhập Tên sản phẩm.'); return; }
+  CUSTOM=CUSTOM.filter(function(c){return norm(c.t)!==norm(t);});
+  CUSTOM.push({t:t, g:(g||t), s:(g||t), qc:qc, en:''});
+  saveCustom();
+  document.getElementById('sp_ten').value=''; document.getElementById('sp_ma').value=''; document.getElementById('sp_qc').value='';
+  applyCatalog();
+  alert('Đã thêm "'+t+'" vào danh mục.');
+}
+function delProduct(){
+  var t=document.getElementById('sp_ten').value.trim();
+  if(!t){ alert('Gõ đúng Tên SP cần xóa vào ô Tên rồi bấm Xóa SP.'); return; }
+  var n=CUSTOM.length;
+  CUSTOM=CUSTOM.filter(function(c){return norm(c.t)!==norm(t);});
+  if(CUSTOM.length===n){ alert('Không thấy SP tự thêm tên đó (chỉ xóa được SP do anh tự thêm).'); return; }
+  saveCustom(); document.getElementById('sp_ten').value=''; applyCatalog();
+  alert('Đã xóa.');
 }
 function setPage(sz){
   var st=document.getElementById('pgstyle');
