@@ -102,11 +102,11 @@
 
 <div class="noprint">
   <h1>🏷️ Tạo tem kiện — Cheng</h1>
-  <div class="sub">Chọn Kho xuất / Kho nhập (thêm hoặc xóa kho tùy ý). Chọn tên sản phẩm trong danh mục (mã QR tự lấy). Nhập ĐVT, Quy cách, HSD, Số lượng → bấm in. Kho xuất <b>Sài Gòn</b> → in tem <b>4 tem/trang A4</b> (máy in thường). Kho xuất <b>khác Sài Gòn</b> → in tem <b>mỗi tem 1 trang khổ A6</b> (máy in nhiệt) và có thêm nút in <b>Phiếu xuất kho A4</b>.</div>
+  <div class="sub">Chọn Kho xuất / Kho nhập (thêm hoặc xóa kho tùy ý). Chọn tên sản phẩm trong danh mục (mã QR tự lấy). Nhập ĐVT, Quy cách, HSD, Số lượng → bấm in. Kho xuất <b>Sài Gòn</b> → in tem <b>4 tem/trang A4</b> (máy in thường), <b>bắt buộc điền Số lô + HSD</b>. Kho xuất <b>khác Sài Gòn</b> → in tem <b>mỗi tem 1 trang khổ A6</b> (máy in nhiệt) và có thêm nút in <b>Phiếu xuất kho A4</b>.</div>
 
   <div class="cfg">
     <label>Kho xuất
-      <select id="src" onchange="togglePhieu();applyCatalog()"></select>
+      <select id="src" onchange="togglePhieu();applyCatalog();toggleLotCols()"></select>
     </label>
     <label>Kho nhập
       <select id="dst"></select>
@@ -139,15 +139,16 @@
   <table>
     <thead>
       <tr>
-        <th style="width:23%">Tên sản phẩm (chọn trong danh mục)</th>
-        <th style="width:9%">ĐVT</th>
-        <th style="width:13%">Quy cách</th>
-        <th style="width:10%">Dung tích</th>
-        <th style="width:12%">HSD</th>
-        <th style="width:12%">Ghi chú</th>
-        <th style="width:8%">Số lượng</th>
-        <th style="width:9%">Gộp lẻ chung thùng</th>
-        <th style="width:4%"></th>
+        <th style="width:20%">Tên sản phẩm (chọn trong danh mục)</th>
+        <th style="width:8%">ĐVT</th>
+        <th style="width:11%">Quy cách</th>
+        <th style="width:8%">Dung tích</th>
+        <th class="col-lot" style="width:9%">Số lô</th>
+        <th class="col-lot" style="width:11%">HSD</th>
+        <th style="width:10%">Ghi chú</th>
+        <th style="width:7%">Số lượng</th>
+        <th style="width:8%">Gộp lẻ chung thùng</th>
+        <th style="width:3%"></th>
       </tr>
     </thead>
     <tbody id="rows"></tbody>
@@ -225,6 +226,10 @@ function togglePhieu(){
   var s=document.getElementById('src').value.trim();
   document.getElementById('btnPhieu').style.display=(s && s!=='Sài Gòn')?'':'none';
 }
+function toggleLotCols(){
+  var show=document.getElementById('src').value.trim()==='Sài Gòn';
+  document.querySelectorAll('.col-lot').forEach(function(el){ el.style.display=show?'':'none'; });
+}
 
 /* ====== Sản phẩm tự thêm (lưu localStorage, vào cả 2 danh mục) ====== */
 function loadCustom(){
@@ -277,13 +282,15 @@ function addRow(v){
     '<td><input class="c-dvt" value="'+(v.dvt||'Thùng')+'"></td>'+
     '<td><input class="c-qc" placeholder="Vd: 45 hộp/thùng" value="'+(v.qc||'')+'"></td>'+
     '<td><input class="c-dt" placeholder="Vd: 30ml" value="'+(v.dt||'')+'"></td>'+
-    '<td><input type="date" class="c-hsd" value="'+(v.hsd||'')+'"></td>'+
+    '<td class="col-lot"><input class="c-lo" placeholder="Số lô" value="'+(v.lo||'')+'"></td>'+
+    '<td class="col-lot"><input type="date" class="c-hsd" value="'+(v.hsd||'')+'"></td>'+
     '<td><input class="c-gc" placeholder="Vd: dễ vỡ..." value="'+(v.gc||'')+'"></td>'+
     '<td class="num"><input class="c-sl" type="number" min="0" step="1" value="'+(v.sl!=null?v.sl:1)+'"></td>'+
     '<td><input class="c-grp" placeholder="vd: A" value="'+(v.grp||'')+'"></td>'+
     '<td style="text-align:center"><button class="del" onclick="this.closest(\'tr\').remove()">✕</button></td>';
   document.getElementById('rows').appendChild(tr);
   if(v.ten) onTen(tr.querySelector('.c-ten'));
+  toggleLotCols();
 }
 
 function fmtHSD(v){
@@ -300,6 +307,7 @@ function genTem(){
     var dvt=tr.querySelector('.c-dvt').value.trim()||'Thùng';
     var qc=tr.querySelector('.c-qc').value.trim();
     var dt=tr.querySelector('.c-dt').value.trim();
+    var lo=tr.querySelector('.c-lo').value.trim();
     var hsd=tr.querySelector('.c-hsd').value.trim();
     var gc=tr.querySelector('.c-gc').value.trim();
     var sl=parseInt(tr.querySelector('.c-sl').value,10)||0;
@@ -308,10 +316,20 @@ function genTem(){
     var m=MAP[norm(ten)];
     if(!m){ bad.push(ten); return; }
     var isBox = /th[uùũ]ng/.test(norm(dvt));   // ĐVT = Thùng -> thùng nguyên
-    items.push({ten:m.t, en:m.en||"", g:m.g, s:m.s, qc:qc, dt:dt, hsd:hsd, gc:gc, dvt:dvt, sl:sl, grp:grp, isBox:isBox});
+    items.push({ten:m.t, en:m.en||"", g:m.g, s:m.s, qc:qc, dt:dt, lo:lo, hsd:hsd, gc:gc, dvt:dvt, sl:sl, grp:grp, isBox:isBox});
   });
   if(bad.length){ if(!confirm('Các mã CHƯA khớp danh mục (sẽ bỏ qua):\n- '+bad.join('\n- ')+'\n\nTiếp tục in phần còn lại?')) return; }
   if(items.length===0){ alert('Chưa có dòng hợp lệ (Tên phải chọn trong danh mục, Số lượng ≥ 1).'); return; }
+
+  // Kho xuất Sài Gòn: BẮT BUỘC điền Số lô và HSD
+  if(src==='Sài Gòn'){
+    var miss=[];
+    items.forEach(function(it){
+      var thieu=[]; if(!it.lo) thieu.push('Số lô'); if(!it.hsd) thieu.push('HSD');
+      if(thieu.length) miss.push(it.ten+' (thiếu '+thieu.join(', ')+')');
+    });
+    if(miss.length){ alert('⚠️ Kho xuất Sài Gòn BẮT BUỘC điền Số lô và HSD.\nChưa đủ:\n- '+miss.join('\n- ')); return; }
+  }
 
   // Dựng danh sách THÙNG: thùng nguyên (ĐVT=Thùng) trước, thùng gộp lẻ sau
   var boxes=[];
@@ -358,6 +376,7 @@ function genTem(){
           (it.en?('<div class="nameEn">'+nameHtml(it.ten)+'</div>'):'')+
           '<div class="qc">'+esc(it.qc||'')+'</div>'+
           (it.dt?('<div class="dt">Dung tích: '+esc(it.dt)+'</div>'):'')+
+          (it.lo?('<div class="dt">Số lô: '+esc(it.lo)+'</div>'):'')+
           (it.gc?('<div class="gc">Ghi chú: '+esc(it.gc)+'</div>'):'')+
           '<div class="hsd">HSD:'+(it.hsd?(' '+esc(fmtHSD(it.hsd))):'<span class="line"></span>')+'</div>'+
           '<div class="kien">Kiện '+g+'/'+M+'</div>'+
@@ -368,6 +387,7 @@ function genTem(){
       var rowsHtml = bx.products.map(function(pr){
         var meta='SKU: '+esc(pr.s||pr.g);
         if(pr.dt) meta+=' · '+esc(pr.dt);
+        if(pr.lo) meta+=' · Lô '+esc(pr.lo);
         if(pr.hsd) meta+=' · HSD '+esc(fmtHSD(pr.hsd));
         if(pr.gc) meta+=' · '+esc(pr.gc);
         return '<div class="mixrow"><div class="mixqr" data-qr="'+esc(pr.g||pr.s||pr.ten)+'"></div><div class="mixL">'+
@@ -446,6 +466,7 @@ function genPhieu(){
 // khởi tạo dropdown kho + danh mục + dòng mẫu
 renderKho();
 applyCatalog();
+toggleLotCols();
 addRow({ten:'Hũ ủ hồng ziemlich (hộp)',dvt:'Thùng',qc:'45 hộp/thùng',sl:5});
 addRow({ten:'Trợ oxy 6% (lọ)',dvt:'Lọ',qc:'168 lọ/thùng',sl:20,grp:'A'});
 addRow({ten:'Trợ oxy 9% (lọ)',dvt:'Lọ',qc:'168 lọ/thùng',sl:15,grp:'A'});
