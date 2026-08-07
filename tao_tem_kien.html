@@ -10,9 +10,15 @@
   body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f4f6fb;color:#1f2933;margin:0;padding:18px;max-width:1180px;margin:0 auto}
   h1{font-size:20px;color:#1F4E78;margin:0 0 4px}
   .sub{color:#667085;font-size:13px;margin-bottom:14px}
-  .cfg{display:flex;flex-wrap:wrap;gap:10px;background:#fff;padding:12px;border-radius:10px;margin-bottom:12px;box-shadow:0 1px 4px rgba(16,24,40,.06)}
+  .cfg{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;background:#fff;padding:12px;border-radius:10px;margin-bottom:12px;box-shadow:0 1px 4px rgba(16,24,40,.06)}
   .cfg label{font-size:12px;color:#475467;display:flex;flex-direction:column;gap:3px}
   .cfg input{padding:8px;border:1px solid #cbd2dd;border-radius:8px;font-size:14px;min-width:150px}
+  .cfg select{padding:8px;border:1px solid #cbd2dd;border-radius:8px;font-size:14px;min-width:160px;background:#fff}
+  .khman{display:flex;align-items:center;gap:6px;margin-left:auto}
+  .khman input{padding:7px;border:1px solid #cbd2dd;border-radius:8px;font-size:13px;width:150px;min-width:120px}
+  .khman button{border:0;border-radius:7px;padding:8px 10px;font-size:13px;font-weight:700;cursor:pointer}
+  .khman .kadd{background:#eaf1fb;color:#1F4E78}
+  .khman .kdel{background:#fdecea;color:#c0392b}
   table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(16,24,40,.06)}
   th{background:#2E75B6;color:#fff;font-size:12px;padding:9px 6px;text-align:left}
   td{border-bottom:1px solid #eef0f4;padding:6px 6px;vertical-align:middle}
@@ -25,6 +31,7 @@
   .btn{border:0;border-radius:9px;padding:11px 18px;font-size:15px;font-weight:700;cursor:pointer}
   .add{background:#eaf1fb;color:#1F4E78}
   .gen{background:#138d75;color:#fff}
+  .btn.slip{background:#2E75B6;color:#fff}
   .hint{color:#98a2b3;font-size:12px;margin-top:6px}
   .hint b{color:#475467}
 
@@ -32,6 +39,10 @@
   .tem{width:105mm;height:148mm;padding:7mm;background:#fff;border:0.3mm dashed #bbb}
   .page{width:210mm;height:297mm;display:flex;flex-wrap:wrap;align-content:flex-start;page-break-after:always}
   .page:last-child{page-break-after:auto}
+  /* mỗi tem 1 trang A6 (máy in nhiệt) */
+  .page6{width:105mm;height:148mm;page-break-after:always;overflow:hidden}
+  .page6:last-child{page-break-after:auto}
+  .page6 .tem{border:0}
   .frame{width:100%;height:100%;border:1.4px solid #000;padding:6mm 5mm;display:flex;flex-direction:column;position:relative}
   .top{display:flex;justify-content:space-between;align-items:flex-end}
   .route{font-weight:700;font-size:12pt}
@@ -40,9 +51,10 @@
   .qrwrap{display:flex;justify-content:center;margin-top:3mm}
   .qrwrap img,.qrwrap canvas{width:40mm !important;height:40mm !important}
   .sku{text-align:center;font-size:10pt;margin-top:1.5mm}
-  .name{text-align:center;font-weight:700;font-size:18pt;line-height:1.15;margin-top:2mm}
+  .name{text-align:center;font-weight:700;font-size:18pt;line-height:1.15;margin-top:2mm;overflow-wrap:break-word;word-break:break-word}
   .name.sm{font-size:15pt}
-  .nameEn{text-align:center;font-size:13pt;font-weight:600;color:#333;margin-top:1.5mm;line-height:1.15}
+  .name.xs{font-size:13pt}
+  .nameEn{text-align:center;font-size:13pt;font-weight:600;color:#333;margin-top:1.5mm;line-height:1.15;overflow-wrap:break-word;word-break:break-word}
   .qc{text-align:center;font-size:15pt;margin-top:3mm}
   .dt{text-align:center;font-size:14pt;margin-top:2mm}
   .gc{text-align:center;font-size:15pt;font-weight:700;margin-top:3mm;color:#000}
@@ -63,83 +75,48 @@
   .mixmeta{font-size:9pt;color:#333;margin-top:.6mm}
   .mixQ{font-weight:800;font-size:13pt;white-space:nowrap}
 
-  /* Quản lý danh mục */
-  .mgr{background:#fff;border:1px solid #dbe2ee;border-radius:10px;margin-bottom:12px;box-shadow:0 1px 4px rgba(16,24,40,.06);overflow:hidden}
-  .mgr>summary{cursor:pointer;padding:12px 14px;font-weight:700;color:#1F4E78;list-style:none;user-select:none;background:#eef3fb}
-  .mgr>summary::-webkit-details-marker{display:none}
-  .mgr>summary::before{content:"▸ ";font-size:12px}
-  .mgr[open]>summary::before{content:"▾ "}
-  .mgrbody{padding:14px}
-  .mgrform{display:grid;grid-template-columns:1.5fr 1.4fr 1fr 1fr 1.1fr auto;gap:8px;align-items:end}
-  @media(max-width:760px){.mgrform{grid-template-columns:1fr 1fr}}
-  .mgrform label{font-size:12px;color:#475467;display:flex;flex-direction:column;gap:3px}
-  .mgrform input{padding:8px;border:1px solid #cbd2dd;border-radius:8px;font-size:14px;width:100%}
-  .mgrbtn{border:0;border-radius:8px;padding:10px 14px;font-weight:700;cursor:pointer;font-size:14px}
-  .mgrbtn.save{background:#138d75;color:#fff}
-  .mgrbtn.sec{background:#eaf1fb;color:#1F4E78}
-  .mgrbtn.warn{background:#fdecea;color:#c0392b}
-  .mgrbar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
-  .mgrsearch{padding:8px;border:1px solid #cbd2dd;border-radius:8px;font-size:14px;width:100%;max-width:320px;margin-bottom:8px}
-  .mgrtbl{width:100%;border-collapse:collapse;font-size:13px}
-  .mgrtbl th{background:#2E75B6;color:#fff;padding:7px 8px;text-align:left;font-size:12px;position:sticky;top:0}
-  .mgrtbl td{border-bottom:1px solid #eef0f4;padding:5px 8px;vertical-align:top}
-  .mgrwrap{max-height:340px;overflow:auto;border:1px solid #eef0f4;border-radius:8px}
-  .mgrdel{background:#fdecea;color:#c0392b;border:0;border-radius:6px;padding:5px 9px;cursor:pointer;font-weight:700}
-  .mgredit{background:#fff7e6;color:#b7791f;border:0;border-radius:6px;padding:5px 9px;cursor:pointer;font-weight:700;margin-right:4px}
-  .mgrcount{color:#667085;font-size:12px}
+  /* Phiếu xuất kho A4 */
+  .slippage{width:210mm;min-height:297mm;padding:15mm;background:#fff;color:#000;page-break-after:always;font-size:11pt}
+  .slippage h2{text-align:center;font-size:17pt;margin:0 0 6px}
+  .slippage .pngay{text-align:center;font-size:10pt;margin-bottom:16px}
+  .slippage .pmeta{font-size:11pt;margin:2px 0}
+  .slptbl{width:100%;border-collapse:collapse;margin-top:10px}
+  .slptbl th,.slptbl td{border:0.6px solid #999;padding:5px 6px;font-size:10pt;vertical-align:middle}
+  .slptbl th{border-bottom:1.1px solid #000;text-align:center;font-weight:700}
+  .slptbl td.c{text-align:center}
+  .slptbl td.r{text-align:right}
+  .slptbl tr.tong td{border-top:1.1px solid #000;font-weight:700;text-align:right}
+  .slpsign{display:flex;justify-content:space-around;margin-top:26px}
+  .slpsign .col{width:80mm;text-align:center;font-size:10pt;padding-bottom:55px}
+  .slpsign .lbl{font-weight:700;margin-bottom:2px}
 
   @media print{
     body{background:#fff;padding:0;max-width:none}
     .noprint{display:none !important}
     #print{display:block}
-    @page{size:A4;margin:0}
   }
 </style>
+<style id="pgstyle">@media print{@page{size:A4;margin:0}}</style>
 </head>
 <body>
 
 <div class="noprint">
   <h1>🏷️ Tạo tem kiện — Cheng</h1>
-  <div class="sub">Chọn tên sản phẩm trong danh mục (mã QR tự lấy). Nhập ĐVT, Quy cách, HSD, Số thùng (nguyên) và Số lẻ nếu có → bấm “Tạo tem &amp; In”. Khổ A6 (105×148mm), 4 tem / trang A4.</div>
+  <div class="sub">Chọn Kho xuất / Kho nhập (thêm hoặc xóa kho tùy ý). Chọn tên sản phẩm trong danh mục (mã QR tự lấy). Nhập ĐVT, Quy cách, HSD, Số lượng → bấm in. Kho xuất <b>Sài Gòn</b> → in tem <b>4 tem/trang A4</b> (máy in thường). Kho xuất <b>khác Sài Gòn</b> → in tem <b>mỗi tem 1 trang khổ A6</b> (máy in nhiệt) và có thêm nút in <b>Phiếu xuất kho A4</b>.</div>
 
   <div class="cfg">
-    <label>Kho xuất<input id="src" value="Sài Gòn"></label>
-    <label>Kho nhập<input id="dst" value="Hà Nội"></label>
-  </div>
-
-  <details class="mgr">
-    <summary>⚙️ Quản lý danh mục sản phẩm — thêm / sửa / xoá</summary>
-    <div class="mgrbody">
-      <div style="font-size:12px;color:#667085;margin-bottom:10px">
-        <b>Mã QR (G SKU)</b> = mã dùng cho QR (nhập kho Gobox). <b>Mã SKU</b> = mã in dưới QR trên tem (để trống thì tem ẩn dòng SKU).
-        Bấm “Lưu vào danh mục” là chọn được ngay. Danh mục lưu trên trình duyệt này.
-      </div>
-      <div class="mgrform">
-        <label>Tên tiếng Việt *<input id="m_t" placeholder="Vd: Trợ oxy 6% (lọ)"></label>
-        <label>Tên tiếng Anh (công bố)<input id="m_en" placeholder="Vd: HYDROGEN PEROXIDE"></label>
-        <label>Mã QR (G SKU) *<input id="m_g" placeholder="Vd: 1082714"></label>
-        <label>Mã SKU (in trên tem)<input id="m_s" placeholder="Vd: td30ml"></label>
-        <label>Quy cách gợi ý<input id="m_qc" placeholder="Vd: 168 lọ/thùng"></label>
-        <button class="mgrbtn save" id="m_add" onclick="mgrAddOrUpdate()">💾 Lưu vào danh mục</button>
-      </div>
-      <input type="hidden" id="m_edit">
-      <div class="mgrbar">
-        <button class="mgrbtn save" onclick="mgrPublish()">☁️ Cập nhật lên link (cho NCC thấy)</button>
-        <button class="mgrbtn sec" onclick="mgrExport()">⬇️ Xuất file JSON</button>
-        <label class="mgrbtn sec" style="display:inline-block">⬆️ Nhập file JSON<input type="file" accept=".json,application/json" onchange="mgrImport(event)" style="display:none"></label>
-        <button class="mgrbtn warn" onclick="mgrReset()">↺ Khôi phục danh mục gốc</button>
-      </div>
-      <div class="mgrcount" id="m_cloud" style="margin-bottom:6px"></div>
-      <input class="mgrsearch" id="m_search" placeholder="🔎 Tìm trong danh mục..." oninput="mgrRender()">
-      <div class="mgrcount" id="m_count"></div>
-      <div class="mgrwrap">
-        <table class="mgrtbl"><thead><tr>
-          <th style="width:30%">Tên tiếng Việt</th><th style="width:20%">Tên tiếng Anh</th>
-          <th style="width:14%">Mã QR</th><th style="width:12%">Mã SKU</th><th style="width:16%">Quy cách</th><th style="width:8%"></th>
-        </tr></thead><tbody id="m_list"></tbody></table>
-      </div>
+    <label>Kho xuất
+      <select id="src" onchange="togglePhieu();applyCatalog()"></select>
+    </label>
+    <label>Kho nhập
+      <select id="dst"></select>
+    </label>
+    <div class="khman">
+      <input id="newkho" placeholder="Tên kho mới..." onkeydown="if(event.key==='Enter'){addKho();return false;}">
+      <button type="button" class="kadd" onclick="addKho()">➕ Thêm kho</button>
+      <button type="button" class="kdel" onclick="delKho()" title="Xóa kho đang chọn ở ô Kho xuất">✕ Xóa kho</button>
     </div>
-  </details>
+  </div>
 
   <datalist id="prods"></datalist>
 
@@ -149,11 +126,10 @@
         <th style="width:23%">Tên sản phẩm (chọn trong danh mục)</th>
         <th style="width:9%">ĐVT</th>
         <th style="width:13%">Quy cách</th>
-        <th style="width:9%">Dung tích</th>
-        <th style="width:10%">Số lô SX</th>
-        <th style="width:11%">HSD</th>
-        <th style="width:11%">Ghi chú</th>
-        <th style="width:7%">Số lượng</th>
+        <th style="width:10%">Dung tích</th>
+        <th style="width:12%">HSD</th>
+        <th style="width:12%">Ghi chú</th>
+        <th style="width:8%">Số lượng</th>
         <th style="width:9%">Gộp lẻ chung thùng</th>
         <th style="width:4%"></th>
       </tr>
@@ -163,7 +139,8 @@
 
   <div class="bar">
     <button class="btn add" onclick="addRow()">➕ Thêm dòng</button>
-    <button class="btn gen" onclick="genTem()">🖨️ Tạo tem &amp; In</button>
+    <button class="btn gen" onclick="genTem()">🏷️ In tem A6</button>
+    <button class="btn slip" id="btnPhieu" onclick="genPhieu()">📄 In phiếu xuất kho A4</button>
   </div>
   <div class="hint">
     <b>ĐVT = Thùng</b> → thùng nguyên: Số lượng là số thùng, in 1 tem/thùng (mỗi thùng 1 mã). &nbsp;
@@ -176,122 +153,66 @@
 <div id="print"></div>
 
 <script>
-var BUILTIN = [{"t": "Dầu gội tím 100ml (lọ)", "g": "1082736", "s": "kv100ml", "qc": "50 lọ/thùng", "en": "PURPLE SHAMPOO NO YELLOW"}, {"t": "Dầu gội tím 20ml (lọ)", "g": "1082729", "s": "kv20ml", "qc": "100 lọ/thùng", "en": "PURPLE SHAMPOO NO YELLOW"}, {"t": "Dầu gội tím 50ml (lọ)", "g": "1082732", "s": "kv50ml", "qc": "50 lọ/thùng", "en": "PURPLE SHAMPOO NO YELLOW"}, {"t": "Hũ ủ hồng ziemlich (hộp)", "g": "1082752", "s": "huhong", "qc": "45 hộp/thùng", "en": "HAIR MASK INTENSIVE RECOVERY"}, {"t": "Hũ ủ tím ziemlich (hộp)", "g": "1082757", "s": "hutim", "qc": "88 hộp/thùng", "en": "HAIR MASK KERATIN COMPLEX"}, {"t": "Keratin ziemlich (lọ)", "g": "1082767", "s": "krt", "qc": "100 lọ/thùng", "en": "KERATIN COLLAGEN"}, {"t": "Nước Hoa Blue Shirt - 10ML (lọ)", "g": "1088305", "s": "z10ml", "qc": "", "en": "BLUE SHIRT"}, {"t": "Nước Hoa Blue Shirt - 2ML (lọ)", "g": "1088276", "s": "z2ml", "qc": "", "en": "BLUE SHIRT"}, {"t": "Nước Hoa Blue Shirt - 30ML (lọ)", "g": "1088323", "s": "z30ml", "qc": "", "en": "BLUE SHIRT"}, {"t": "Nước Hoa DARK BEAUTY - 10ML (lọ)", "g": "1088291", "s": "db10ml", "qc": "", "en": "DARK BEAUTY"}, {"t": "Nước Hoa DARK BEAUTY - 2ML (lọ)", "g": "1088258", "s": "db2ml", "qc": "", "en": "DARK BEAUTY"}, {"t": "Nước Hoa DARK BEAUTY - 30ML (lọ)", "g": "1088313", "s": "db30ml", "qc": "", "en": "DARK BEAUTY"}, {"t": "Nước Hoa FIRST LOVE - 10ML (lọ)", "g": "1088300", "s": "fl10ml", "qc": "", "en": "FIRST LOVE"}, {"t": "Nước Hoa FIRST LOVE - 2ML (lọ)", "g": "1088267", "s": "fl2ml", "qc": "", "en": "FIRST LOVE"}, {"t": "Nước Hoa FIRST LOVE - 30ML (lọ)", "g": "1088318", "s": "fl30ml", "qc": "", "en": "FIRST LOVE"}, {"t": "Nước Hoa GIRL POWER - 10ML (lọ)", "g": "1088301", "s": "gp10ml", "qc": "", "en": "GIRL POWER"}, {"t": "Nước Hoa GIRL POWER - 2ML (lọ)", "g": "1088269", "s": "gp2ml", "qc": "", "en": "GIRL POWER"}, {"t": "Nước Hoa GIRL POWER - 30ML (lọ)", "g": "1088319", "s": "gp30ml", "qc": "", "en": "GIRL POWER"}, {"t": "Nước Hoa JASMINE AMBER - 10ML (lọ)", "g": "1088289", "s": "ja10ml", "qc": "", "en": "JASMINE & AMBER"}, {"t": "Nước Hoa JASMINE AMBER - 2ML (lọ)", "g": "1088256", "s": "ja2ml", "qc": "", "en": "JASMINE & AMBER"}, {"t": "Nước Hoa JASMINE AMBER - 30ML (lọ)", "g": "1088312", "s": "ja30ml", "qc": "", "en": "JASMINE & AMBER"}, {"t": "Nước Hoa LADYKILLER - 10ML (lọ)", "g": "1088295", "s": "lk10ml", "qc": "", "en": "LADYKILLER"}, {"t": "Nước Hoa LADYKILLER - 2ML (lọ)", "g": "1088261", "s": "lk2ml", "qc": "", "en": "LADYKILLER"}, {"t": "Nước Hoa LADYKILLER - 30ML (lọ)", "g": "1088315", "s": "lk30ml", "qc": "", "en": "LADYKILLER"}, {"t": "Nước Hoa VENUS - 10ML (lọ)", "g": "1088297", "s": "vn10ml", "qc": "", "en": "VENUS"}, {"t": "Nước Hoa VENUS - 2ML (lọ)", "g": "1088263", "s": "vn2ml", "qc": "", "en": "VENUS"}, {"t": "Nước Hoa VENUS - 30ML (lọ)", "g": "1088316", "s": "vn30ml", "qc": "", "en": "VENUS"}, {"t": "Sữa tắm Dark Beauty (chai)", "g": "1088268", "s": "stdb", "qc": "", "en": "SHOWER PERFUME GEL DARK BEAUTY"}, {"t": "Sữa tắm First Love (chai)", "g": "1088275", "s": "stfl", "qc": "", "en": "SHOWER PERFUME GEL FIRST LOVE"}, {"t": "Sữa tắm Girl Power (chai)", "g": "1088273", "s": "stgp", "qc": "", "en": "SHOWER PERFUME GEL GIRL POWER"}, {"t": "Sữa tắm Jasmine Amber (chai)", "g": "1088277", "s": "stja", "qc": "", "en": "SHOWER PERFUME GEL JASMINE & AMBER"}, {"t": "Sữa tắm Venus (chai)", "g": "1088270", "s": "stvn", "qc": "", "en": "SHOWER PERFUME GEL VENUS"}, {"t": "Trợ oxy 12% (lọ)", "g": "1082724", "s": "0.12", "qc": "168 lọ/thùng", "en": "HYDROGEN PEROXIDE"}, {"t": "Trợ oxy 3% (lọ)", "g": "1082708", "s": "0.03", "qc": "168 lọ/thùng", "en": "HYDROGEN PEROXIDE"}, {"t": "Trợ oxy 6% (lọ)", "g": "1082714", "s": "0.06", "qc": "168 lọ/thùng", "en": "HYDROGEN PEROXIDE"}, {"t": "Trợ oxy 9% (lọ)", "g": "1082718", "s": "0.09", "qc": "168 lọ/thùng", "en": "HYDROGEN PEROXIDE"}, {"t": "Tinh dầu 100ml (lọ)", "g": "1082748", "s": "td100ml", "qc": "100 lọ/thùng", "en": "HAIR ESSENTIAL OIL"}, {"t": "Tẩy ziemlich bé (hộp)", "g": "1082798", "s": "tb", "qc": "50 hộp/thùng", "en": "BLEACHING KIT"}, {"t": "Tẩy ziemlich to (hộp)", "g": "1082803", "s": "tt", "qc": "104 hộp/thùng", "en": "BLEACHING KIT"}, {"t": "Ủ ziemlich hồng (gói)", "g": "1082694", "s": "uhong", "qc": "600 gói/thùng", "en": "HAIR MASK INTENSIVE RECOVERY"}, {"t": "Ủ ziemlich tím (gói)", "g": "1082699", "s": "utim", "qc": "600 gói/thùng", "en": "HAIR MASK KERATIN COMPLEX"}];
+var CATALOG_SG = [{"t": "Dầu gội tím 100ml (lọ)", "g": "1082736", "s": "kv100ml", "qc": "50 lọ/thùng", "en": "PURPLE SHAMPOO NO YELLOW"}, {"t": "Dầu gội tím 20ml (lọ)", "g": "1082729", "s": "kv20ml", "qc": "100 lọ/thùng", "en": "PURPLE SHAMPOO NO YELLOW"}, {"t": "Dầu gội tím 50ml (lọ)", "g": "1082732", "s": "kv50ml", "qc": "50 lọ/thùng", "en": "PURPLE SHAMPOO NO YELLOW"}, {"t": "Hũ ủ hồng ziemlich (hộp)", "g": "1082752", "s": "huhong", "qc": "45 hộp/thùng", "en": "HAIR MASK INTENSIVE RECOVERY"}, {"t": "Hũ ủ tím ziemlich (hộp)", "g": "1082757", "s": "hutim", "qc": "88 hộp/thùng", "en": "HAIR MASK KERATIN COMPLEX"}, {"t": "Keratin ziemlich (lọ)", "g": "1082767", "s": "krt", "qc": "100 lọ/thùng", "en": "KERATIN COLLAGEN"}, {"t": "Nước Hoa Blue Shirt - 10ML (lọ)", "g": "1088305", "s": "z10ml", "qc": "", "en": "BLUE SHIRT"}, {"t": "Nước Hoa Blue Shirt - 2ML (lọ)", "g": "1088276", "s": "z2ml", "qc": "", "en": "BLUE SHIRT"}, {"t": "Nước Hoa Blue Shirt - 30ML (lọ)", "g": "1088323", "s": "z30ml", "qc": "", "en": "BLUE SHIRT"}, {"t": "Nước Hoa DARK BEAUTY - 10ML (lọ)", "g": "1088291", "s": "db10ml", "qc": "", "en": "DARK BEAUTY"}, {"t": "Nước Hoa DARK BEAUTY - 2ML (lọ)", "g": "1088258", "s": "db2ml", "qc": "", "en": "DARK BEAUTY"}, {"t": "Nước Hoa DARK BEAUTY - 30ML (lọ)", "g": "1088313", "s": "db30ml", "qc": "", "en": "DARK BEAUTY"}, {"t": "Nước Hoa FIRST LOVE - 10ML (lọ)", "g": "1088300", "s": "fl10ml", "qc": "", "en": "FIRST LOVE"}, {"t": "Nước Hoa FIRST LOVE - 2ML (lọ)", "g": "1088267", "s": "fl2ml", "qc": "", "en": "FIRST LOVE"}, {"t": "Nước Hoa FIRST LOVE - 30ML (lọ)", "g": "1088318", "s": "fl30ml", "qc": "", "en": "FIRST LOVE"}, {"t": "Nước Hoa GIRL POWER - 10ML (lọ)", "g": "1088301", "s": "gp10ml", "qc": "", "en": "GIRL POWER"}, {"t": "Nước Hoa GIRL POWER - 2ML (lọ)", "g": "1088269", "s": "gp2ml", "qc": "", "en": "GIRL POWER"}, {"t": "Nước Hoa GIRL POWER - 30ML (lọ)", "g": "1088319", "s": "gp30ml", "qc": "", "en": "GIRL POWER"}, {"t": "Nước Hoa JASMINE AMBER - 10ML (lọ)", "g": "1088289", "s": "ja10ml", "qc": "", "en": "JASMINE & AMBER"}, {"t": "Nước Hoa JASMINE AMBER - 2ML (lọ)", "g": "1088256", "s": "ja2ml", "qc": "", "en": "JASMINE & AMBER"}, {"t": "Nước Hoa JASMINE AMBER - 30ML (lọ)", "g": "1088312", "s": "ja30ml", "qc": "", "en": "JASMINE & AMBER"}, {"t": "Nước Hoa LADYKILLER - 10ML (lọ)", "g": "1088295", "s": "lk10ml", "qc": "", "en": "LADYKILLER"}, {"t": "Nước Hoa LADYKILLER - 2ML (lọ)", "g": "1088261", "s": "lk2ml", "qc": "", "en": "LADYKILLER"}, {"t": "Nước Hoa LADYKILLER - 30ML (lọ)", "g": "1088315", "s": "lk30ml", "qc": "", "en": "LADYKILLER"}, {"t": "Nước Hoa VENUS - 10ML (lọ)", "g": "1088297", "s": "vn10ml", "qc": "", "en": "VENUS"}, {"t": "Nước Hoa VENUS - 2ML (lọ)", "g": "1088263", "s": "vn2ml", "qc": "", "en": "VENUS"}, {"t": "Nước Hoa VENUS - 30ML (lọ)", "g": "1088316", "s": "vn30ml", "qc": "", "en": "VENUS"}, {"t": "Sữa tắm Dark Beauty (chai)", "g": "1088268", "s": "stdb", "qc": "", "en": "SHOWER PERFUME GEL DARK BEAUTY"}, {"t": "Sữa tắm First Love (chai)", "g": "1088275", "s": "stfl", "qc": "", "en": "SHOWER PERFUME GEL FIRST LOVE"}, {"t": "Sữa tắm Girl Power (chai)", "g": "1088273", "s": "stgp", "qc": "", "en": "SHOWER PERFUME GEL GIRL POWER"}, {"t": "Sữa tắm Jasmine Amber (chai)", "g": "1088277", "s": "stja", "qc": "", "en": "SHOWER PERFUME GEL JASMINE & AMBER"}, {"t": "Sữa tắm Venus (chai)", "g": "1088270", "s": "stvn", "qc": "", "en": "SHOWER PERFUME GEL VENUS"}, {"t": "Trợ oxy 12% (lọ)", "g": "1082724", "s": "0.12", "qc": "168 lọ/thùng", "en": "HYDROGEN PEROXIDE"}, {"t": "Trợ oxy 3% (lọ)", "g": "1082708", "s": "0.03", "qc": "168 lọ/thùng", "en": "HYDROGEN PEROXIDE"}, {"t": "Trợ oxy 6% (lọ)", "g": "1082714", "s": "0.06", "qc": "168 lọ/thùng", "en": "HYDROGEN PEROXIDE"}, {"t": "Trợ oxy 9% (lọ)", "g": "1082718", "s": "0.09", "qc": "168 lọ/thùng", "en": "HYDROGEN PEROXIDE"}, {"t": "Tinh dầu 100ml (lọ)", "g": "1082748", "s": "td100ml", "qc": "100 lọ/thùng", "en": "HAIR ESSENTIAL OIL"}, {"t": "Tẩy ziemlich bé (hộp)", "g": "1082798", "s": "tb", "qc": "50 hộp/thùng", "en": "BLEACHING KIT"}, {"t": "Tẩy ziemlich to (hộp)", "g": "1082803", "s": "tt", "qc": "104 hộp/thùng", "en": "BLEACHING KIT"}, {"t": "Ủ ziemlich hồng (gói)", "g": "1082694", "s": "uhong", "qc": "600 gói/thùng", "en": "HAIR MASK INTENSIVE RECOVERY"}, {"t": "Ủ ziemlich tím (gói)", "g": "1082699", "s": "utim", "qc": "600 gói/thùng", "en": "HAIR MASK KERATIN COMPLEX"}];
+var CATALOG_FULL = [{"t":"PopSocket giá đỡ gắn điện thoại sinh nhật Cheng","g":"1128428","s":"popsocketqt","qc":"","en":""},{"t":"10 gói nhuộm bọt - chocolate (hộp)","g":"1082867","s":"10goiccl","qc":"48 hộp/thùng","en":""},{"t":"10 gói nhuộm bọt - hạt dẻ (hộp)","g":"1082841","s":"10goihd","qc":"48 hộp/thùng","en":""},{"t":"10 gói nhuộm bọt - mocha (hộp)","g":"1082891","s":"10goimc","qc":"48 hộp/thùng","en":""},{"t":"10 gói nhuộm bọt - nâu cam (hộp)","g":"1082894","s":"10goinc","qc":"48 hộp/thùng","en":""},{"t":"10 gói nhuộm bọt - nâu hồng đào (hộp)","g":"1082864","s":"10goinhd","qc":"48 hộp/thùng","en":""},{"t":"10 gói nhuộm bọt - nâu lạnh (hộp)","g":"1082870","s":"10goinl","qc":"48 hộp/thùng","en":""},{"t":"10 gói nhuộm bọt - nâu lạnh trầm (hộp)","g":"1082861","s":"10goinlt","qc":"48 hộp/thùng","en":""},{"t":"10 gói nhuộm bọt - nâu sữa (hộp)","g":"1082873","s":"10goins","qc":"48 hộp/thùng","en":""},{"t":"10 gói nhuộm bọt - nâu trà đen (hộp)","g":"1082899","s":"10gointd","qc":"48 hộp/thùng","en":""},{"t":"10 gói nhuộm bọt - nâu tây (hộp)","g":"1082882","s":"10goint","qc":"48 hộp/thùng","en":""},{"t":"10 gói nhuộm bọt - nâu đen (hộp)","g":"1082888","s":"10goind","qc":"48 hộp/thùng","en":""},{"t":"10 gói nhuộm bọt - phúc bồn tử (hộp)","g":"1082851","s":"10goipbt","qc":"48 hộp/thùng","en":""},{"t":"10 gói nhuộm bọt - trà lạnh (hộp)","g":"1082879","s":"10goitl","qc":"48 hộp/thùng","en":""},{"t":"10 gói nhuộm bọt - xanh dương đen khói (hộp)","g":"1082885","s":"10goixddk","qc":"48 hộp/thùng","en":""},{"t":"10 gói nhuộm bọt - đen tuyền (hộp)","g":"1082835","s":"10goidt","qc":"48 hộp/thùng","en":""},{"t":"10 gói nhuộm bọt - đỏ rượu vang (hộp)","g":"1082876","s":"10goidrv","qc":"48 hộp/thùng","en":""},{"t":"3 gói nhuộm bọt - chocolate (túi)","g":"1082869","s":"3goiccl","qc":"48 túi/thùng","en":""},{"t":"3 gói nhuộm bọt - hạt dẻ (túi)","g":"1082845","s":"3goihd","qc":"48 túi/thùng","en":""},{"t":"3 gói nhuộm bọt - mocha (túi)","g":"1082893","s":"3goimc","qc":"48 túi/thùng","en":""},{"t":"3 gói nhuộm bọt - nâu cam (túi)","g":"1082896","s":"3goinc","qc":"48 túi/thùng","en":""},{"t":"3 gói nhuộm bọt - nâu hồng đào (túi)","g":"1082866","s":"3goinhd","qc":"48 túi/thùng","en":""},{"t":"3 gói nhuộm bọt - nâu lạnh (túi)","g":"1082872","s":"3goinl","qc":"48 túi/thùng","en":""},{"t":"3 gói nhuộm bọt - nâu lạnh trầm (túi)","g":"1082863","s":"3goinlt","qc":"48 túi/thùng","en":""},{"t":"3 gói nhuộm bọt - nâu sữa (túi)","g":"1082875","s":"3goins","qc":"48 túi/thùng","en":""},{"t":"3 gói nhuộm bọt - nâu trà đen (túi)","g":"1082849","s":"3gointd","qc":"48 túi/thùng","en":""},{"t":"3 gói nhuộm bọt - nâu tây (túi)","g":"1082884","s":"3goint","qc":"48 túi/thùng","en":""},{"t":"3 gói nhuộm bọt - nâu đen (túi)","g":"1082890","s":"3goind","qc":"48 túi/thùng","en":""},{"t":"3 gói nhuộm bọt - phúc bồn tử (túi)","g":"1082860","s":"3goipbt","qc":"48 túi/thùng","en":""},{"t":"3 gói nhuộm bọt - trà lạnh (túi)","g":"1082881","s":"3goitl","qc":"48 túi/thùng","en":""},{"t":"3 gói nhuộm bọt - xanh dương đen khói (túi)","g":"1082887","s":"3goixddk","qc":"48 túi/thùng","en":""},{"t":"3 gói nhuộm bọt - đen tuyền (túi)","g":"1082839","s":"3goidt","qc":"48 túi/thùng","en":""},{"t":"3 gói nhuộm bọt - đỏ rượu vang (túi)","g":"1082878","s":"3goidrv","qc":"48 túi/thùng","en":""},{"t":"5 gói nhuộm bọt - chocolate (hộp)","g":"1082868","s":"5goiccl","qc":"48 hộp/thùng","en":""},{"t":"5 gói nhuộm bọt - hạt dẻ (hộp)","g":"1082843","s":"5goihd","qc":"48 hộp/thùng","en":""},{"t":"5 gói nhuộm bọt - mocha (hộp)","g":"1082892","s":"5goimc","qc":"48 hộp/thùng","en":""},{"t":"5 gói nhuộm bọt - nâu cam (hộp)","g":"1082895","s":"5goinc","qc":"48 hộp/thùng","en":""},{"t":"5 gói nhuộm bọt - nâu hồng đào (hộp)","g":"1082865","s":"5goinhd","qc":"48 hộp/thùng","en":""},{"t":"5 gói nhuộm bọt - nâu lạnh (hộp)","g":"1082871","s":"5goinl","qc":"48 hộp/thùng","en":""},{"t":"5 gói nhuộm bọt - nâu lạnh trầm (hộp)","g":"1082862","s":"5goinlt","qc":"48 hộp/thùng","en":""},{"t":"5 gói nhuộm bọt - nâu sữa (hộp)","g":"1082874","s":"5goins","qc":"48 hộp/thùng","en":""},{"t":"5 gói nhuộm bọt - nâu trà đen (hộp)","g":"1082847","s":"5gointd","qc":"48 hộp/thùng","en":""},{"t":"5 gói nhuộm bọt - nâu tây (hộp)","g":"1082883","s":"5goint","qc":"48 hộp/thùng","en":""},{"t":"5 gói nhuộm bọt - nâu đen (hộp)","g":"1082889","s":"5goind","qc":"48 hộp/thùng","en":""},{"t":"5 gói nhuộm bọt - phúc bồn tử (hộp)","g":"1082859","s":"5goipbt","qc":"48 hộp/thùng","en":""},{"t":"5 gói nhuộm bọt - trà lạnh (hộp)","g":"1082880","s":"5goitl","qc":"48 hộp/thùng","en":""},{"t":"5 gói nhuộm bọt - xanh dương đen khói (hộp)","g":"1082886","s":"5goixddk","qc":"48 hộp/thùng","en":""},{"t":"5 gói nhuộm bọt - đen tuyền (hộp)","g":"1082837","s":"5goidt","qc":"48 hộp/thùng","en":""},{"t":"5 gói nhuộm bọt - đỏ rượu vang (hộp)","g":"1082877","s":"5goidrv","qc":"48 hộp/thùng","en":""},{"t":"Bạch kim - dưỡng nhiều (hộp)","g":"1082744","s":"bk160","qc":"50 hộp/thùng","en":""},{"t":"Nâu bơ - dưỡng nhiều (hộp)","g":"1082818","s":"nb160","qc":"50 hộp/thùng","en":""},{"t":"Nâu cam - dưỡng nhiều (hộp)","g":"1082725","s":"nc160","qc":"50 hộp/thùng","en":""},{"t":"Nâu cam cháy - dưỡng nhiều (hộp)","g":"1082728","s":"ncc160","qc":"50 hộp/thùng","en":""},{"t":"Nâu cam gỗ - dưỡng nhiều (hộp)","g":"1082742","s":"ncg160","qc":"50 hộp/thùng","en":""},{"t":"Nâu cam đất - dưỡng nhiều (hộp)","g":"1082766","s":"ncd160","qc":"50 hộp/thùng","en":""},{"t":"Nâu chocolate - dưỡng nhiều (hộp)","g":"1082679","s":"ccl160","qc":"50 hộp/thùng","en":""},{"t":"Nâu coffee - dưỡng nhiều (hộp)","g":"1082675","s":"cf160","qc":"50 hộp/thùng","en":""},{"t":"Nâu hạt dẻ - dưỡng nhiều (hộp)","g":"1082749","s":"hd160","qc":"50 hộp/thùng","en":""},{"t":"Nâu hồng đào - dưỡng nhiều (hộp)","g":"1082658","s":"nhd160","qc":"50 hộp/thùng","en":""},{"t":"Nâu khói sáng - dưỡng nhiều (hộp)","g":"1082814","s":"nks160","qc":"50 hộp/thùng","en":""},{"t":"Nâu khói trầm - dưỡng nhiều (hộp)","g":"1082756","s":"nkt160","qc":"50 hộp/thùng","en":""},{"t":"Nâu lạnh - dưỡng nhiều (hộp)","g":"1082781","s":"nl160","qc":"50 hộp/thùng","en":""},{"t":"Nâu lạnh trầm - dưỡng nhiều (hộp)","g":"1082787","s":"nlt160","qc":"50 hộp/thùng","en":""},{"t":"Nâu lạnh ánh khói - dưỡng nhiều (hộp)","g":"1082753","s":"nlak160","qc":"50 hộp/thùng","en":""},{"t":"Nâu mocha - dưỡng nhiều (hộp)","g":"1082685","s":"mc160","qc":"50 hộp/thùng","en":""},{"t":"Nâu sữa - dưỡng nhiều (hộp)","g":"1082811","s":"ns160","qc":"50 hộp/thùng","en":""},{"t":"Nâu trà đen - dưỡng nhiều (hộp)","g":"1082771","s":"ntd160","qc":"50 hộp/thùng","en":""},{"t":"Nâu tây - dưỡng nhiều (hộp)","g":"1082821","s":"nt160","qc":"50 hộp/thùng","en":""},{"t":"Nâu tây lạnh - dưỡng nhiều (hộp)","g":"1082796","s":"ntl160","qc":"50 hộp/thùng","en":""},{"t":"Nâu tím - dưỡng nhiều (hộp)","g":"1082711","s":"ntim160","qc":"50 hộp/thùng","en":""},{"t":"Nâu xám hạt dẻ - dưỡng nhiều (hộp)","g":"1082801","s":"nxhd160","qc":"50 hộp/thùng","en":""},{"t":"Nâu xám khói - dưỡng nhiều (hộp)","g":"1082763","s":"nxk160","qc":"50 hộp/thùng","en":""},{"t":"Nâu đen - dưỡng nhiều (hộp)","g":"1082715","s":"nd160","qc":"50 hộp/thùng","en":""},{"t":"Nâu đỏ - dưỡng nhiều (hộp)","g":"1082672","s":"ndo160","qc":"50 hộp/thùng","en":""},{"t":"Nâu đỏ cherry - dưỡng nhiều (hộp)","g":"1082654","s":"ndc160","qc":"50 hộp/thùng","en":""},{"t":"Nâu đỏ đất - dưỡng nhiều (hộp)","g":"1082776","s":"ndd160","qc":"50 hộp/thùng","en":""},{"t":"Nâu đồng ánh cam - dưỡng nhiều (hộp)","g":"1082734","s":"ndac160","qc":"50 hộp/thùng","en":""},{"t":"Phúc bồn tử - dưỡng nhiều (hộp)","g":"1082668","s":"pbt160","qc":"50 hộp/thùng","en":""},{"t":"Phủ bạc nâu lạnh - dưỡng nhiều (hộp)","g":"1082831","s":"pbnl160","qc":"80 hộp/thùng","en":""},{"t":"Rêu khói trầm - dưỡng nhiều (hộp)","g":"1082689","s":"rkt160","qc":"50 hộp/thùng","en":""},{"t":"Rêu đá lạnh - dưỡng nhiều (hộp)","g":"1082826","s":"rdl160","qc":"50 hộp/thùng","en":""},{"t":"Than chì - dưỡng nhiều (hộp)","g":"1082817","s":"tc160","qc":"50 hộp/thùng","en":""},{"t":"Trà Lạnh - Dưỡng Nhiều (hộp)","g":"1082791","s":"tl160","qc":"50 hộp/thùng","en":""},{"t":"Tím trà - dưỡng nhiều (hộp)","g":"1082707","s":"tt160","qc":"50 hộp/thùng","en":""},{"t":"Xanh dương đen khói - dưỡng nhiều (hộp)","g":"1082812","s":"xddk160","qc":"50 hộp/thùng","en":""},{"t":"Xanh than - dưỡng nhiều (hộp)","g":"1082806","s":"xt160","qc":"50 hộp/thùng","en":""},{"t":"Xám khói - dưỡng nhiều (hộp)","g":"1082822","s":"xk160","qc":"50 hộp/thùng","en":""},{"t":"Đen tuyền - dưỡng nhiều (hộp)","g":"1082721","s":"dt160","qc":"50 hộp/thùng","en":""},{"t":"Đen tím - dưỡng nhiều (hộp)","g":"1082701","s":"dtim160","qc":"50 hộp/thùng","en":""},{"t":"Đỏ dâu - dưỡng nhiều (hộp)","g":"1082824","s":"dd160","qc":"50 hộp/thùng","en":""},{"t":"Đỏ lửa - dưỡng nhiều (hộp)","g":"1082696","s":"dl160","qc":"50 hộp/thùng","en":""},{"t":"Đỏ rượu vang - dưỡng nhiều (hộp)","g":"1082664","s":"drv160","qc":"50 hộp/thùng","en":""},{"t":"Bạch kim - dưỡng vừa (hộp)","g":"1082723","s":"bk120","qc":"50 hộp/thùng","en":""},{"t":"Nâu Chocolate - dưỡng vừa (hộp)","g":"1082674","s":"ccl120","qc":"50 hộp/thùng","en":""},{"t":"Nâu Mocha - dưỡng vừa (hộp)","g":"1082677","s":"mc120","qc":"50 hộp/thùng","en":""},{"t":"Nâu bơ - dưỡng vừa (hộp)","g":"1082813","s":"nb120","qc":"50 hộp/thùng","en":""},{"t":"Nâu cam - dưỡng vừa (hộp)","g":"1082710","s":"nc120","qc":"50 hộp/thùng","en":""},{"t":"Nâu cam cháy - dưỡng vừa (hộp)","g":"1082713","s":"ncc120","qc":"50 hộp/thùng","en":""},{"t":"Nâu cam gỗ - dưỡng vừa (hộp)","g":"1082720","s":"ncg120","qc":"50 hộp/thùng","en":""},{"t":"Nâu cam đất - dưỡng vừa (hộp)","g":"1082747","s":"ncd120","qc":"50 hộp/thùng","en":""},{"t":"Nâu coffee - dưỡng vừa (hộp)","g":"1082669","s":"cf120","qc":"50 hộp/thùng","en":""},{"t":"Nâu hạt dẻ - dưỡng vừa (hộp)","g":"1082731","s":"hd120","qc":"50 hộp/thùng","en":""},{"t":"Nâu hồng đào - dưỡng vừa (hộp)","g":"1082656","s":"nhd120","qc":"50 hộp/thùng","en":""},{"t":"Nâu khói sáng - dưỡng vừa (hộp)","g":"1082810","s":"nks120","qc":"50 hộp/thùng","en":""},{"t":"Nâu khói trầm - dưỡng vừa (hộp)","g":"1082735","s":"nkt120","qc":"50 hộp/thùng","en":""},{"t":"Nâu lạnh - dưỡng vừa (hộp)","g":"1082760","s":"nl120","qc":"50 hộp/thùng","en":""},{"t":"Nâu lạnh trầm - dưỡng vừa (hộp)","g":"1082765","s":"nlt120","qc":"50 hộp/thùng","en":""},{"t":"Nâu lạnh ánh khói - dưỡng vừa (hộp)","g":"1082739","s":"nlak120","qc":"50 hộp/thùng","en":""},{"t":"Nâu olive - dưỡng vừa (hộp)","g":"1082750","s":"no120","qc":"50 hộp/thùng","en":""},{"t":"Nâu rêu - dưỡng vừa (hộp)","g":"1082683","s":"nr120","qc":"50 hộp/thùng","en":""},{"t":"Nâu sữa - dưỡng vừa (hộp)","g":"1082807","s":"ns120","qc":"50 hộp/thùng","en":""},{"t":"Nâu trà lạnh - dưỡng vừa (hộp)","g":"1082769","s":"tl120","qc":"50 hộp/thùng","en":""},{"t":"Nâu trà đen - dưỡng vừa (hộp)","g":"1082754","s":"ntd120","qc":"50 hộp/thùng","en":""},{"t":"Nâu tây - dưỡng vừa (hộp)","g":"1082816","s":"nt120","qc":"50 hộp/thùng","en":""},{"t":"Nâu tây lạnh - dưỡng vừa (hộp)","g":"1082772","s":"ntl120","qc":"50 hộp/thùng","en":""},{"t":"Nâu tím - dưỡng vừa (hộp)","g":"1082697","s":"ntim120","qc":"50 hộp/thùng","en":""},{"t":"Nâu xám hạt dẻ - dưỡng vừa (hộp)","g":"1082775","s":"nxhd120","qc":"50 hộp/thùng","en":""},{"t":"Nâu xám khói - dưỡng vừa (hộp)","g":"1082737","s":"nxk120","qc":"50 hộp/thùng","en":""},{"t":"Nâu đen - dưỡng vừa (hộp)","g":"1082700","s":"nd120","qc":"50 hộp/thùng","en":""},{"t":"Nâu đỏ - dưỡng vừa (hộp)","g":"1082667","s":"ndo120","qc":"50 hộp/thùng","en":""},{"t":"Nâu đỏ cherry - dưỡng vừa (hộp)","g":"1082823","s":"ndc120","qc":"50 hộp/thùng","en":""},{"t":"Nâu đỏ đất - dưỡng vừa (hộp)","g":"1082759","s":"ndd120","qc":"50 hộp/thùng","en":""},{"t":"Nâu đồng ánh cam - dưỡng vừa (hộp)","g":"1082717","s":"ndac120","qc":"50 hộp/thùng","en":""},{"t":"Phúc bồn tử - dưỡng vừa (hộp)","g":"1082663","s":"pbt120","qc":"50 hộp/thùng","en":""},{"t":"Phủ bạc nâu lạnh - dưỡng vừa (hộp)","g":"1082804","s":"pbnl120","qc":"50 hộp/thùng","en":""},{"t":"Rêu khói trầm - dưỡng vừa (hộp)","g":"1082680","s":"rkt120","qc":"50 hộp/thùng","en":""},{"t":"Rêu đá lạnh - dưỡng vừa (hộp)","g":"1082794","s":"rdl120","qc":"50 hộp/thùng","en":""},{"t":"Than chì - dưỡng vừa (hộp)","g":"1082790","s":"tc120","qc":"50 hộp/thùng","en":""},{"t":"Tím trà - dưỡng vừa (hộp)","g":"1082693","s":"tt120","qc":"50 hộp/thùng","en":""},{"t":"Vàng mơ - dưỡng vừa (hộp)","g":"1082706","s":"vm120","qc":"50 hộp/thùng","en":""},{"t":"Vàng tro vàng khói - dưỡng vừa (hộp)","g":"1082727","s":"vtvk120","qc":"50 hộp/thùng","en":""},{"t":"Xanh dương đen khói - dưỡng vừa (hộp)","g":"1082777","s":"xddk120","qc":"50 hộp/thùng","en":""},{"t":"Xanh than - dưỡng vừa (hộp)","g":"1082786","s":"xt120","qc":"50 hộp/thùng","en":""},{"t":"Xám khói - dưỡng vừa (hộp)","g":"1082784","s":"xk120","qc":"50 hộp/thùng","en":""},{"t":"Đen tuyền - dưỡng vừa (hộp)","g":"1082703","s":"dt120","qc":"50 hộp/thùng","en":""},{"t":"Đen tím - dưỡng vừa (hộp)","g":"1082691","s":"dtim120","qc":"50 hộp/thùng","en":""},{"t":"Đỏ dâu - dưỡng vừa (hộp)","g":"1082819","s":"dd120","qc":"50 hộp/thùng","en":""},{"t":"Đỏ lửa - dưỡng vừa (hộp)","g":"1082687","s":"dl120","qc":"50 hộp/thùng","en":""},{"t":"Đỏ rượu vang - dưỡng vừa (hộp)","g":"1082661","s":"drv120","qc":"50 hộp/thùng","en":""},{"t":"6/75 - dưỡng ít","g":"1082705","s":"mc65","qc":"100/thùng","en":""},{"t":"7/3","g":"1082673","s":"nt65","qc":"100/thùng","en":""},{"t":"6/45","g":"1082695","s":"ndo65","qc":"100/thùng","en":""},{"t":"8/43","g":"1082743","s":"ncc65","qc":"100/thùng","en":""},{"t":"6/71","g":"1082799","s":"tl65","qc":"100/thùng","en":""},{"t":"Nâu cam - dưỡng ít + 9% (tuýp)","g":"1082741","s":"nc65","qc":"100 tuýp/thùng","en":""},{"t":"Nâu hồng đào - dưỡng ít + 9% (tuýp)","g":"1082684","s":"nhd65","qc":"100 tuýp/thùng","en":""},{"t":"Nâu khói trầm - dưỡng ít + 9% (tuýp)","g":"1082662","s":"nkt65","qc":"100 tuýp/thùng","en":""},{"t":"Nâu lạnh trầm - dưỡng ít + 9% (tuýp)","g":"1082795","s":"nlt65","qc":"100 tuýp/thùng","en":""},{"t":"Nâu olive - dưỡng ít + 9% (tuýp)","g":"1082789","s":"no65","qc":"100 tuýp/thùng","en":""},{"t":"Nâu rêu - dưỡng ít + 9% (tuýp)","g":"1082712","s":"nr65","qc":"100 tuýp/thùng","en":""},{"t":"Nâu tây lạnh - dưỡng ít + 9% (tuýp)","g":"1082802","s":"ntl65","qc":"100 tuýp/thùng","en":""},{"t":"Nâu đồng ánh cam - dưỡng ít + 9% (tuýp)","g":"1082746","s":"ndac65","qc":"100 tuýp/thùng","en":""},{"t":"Phúc bồn tử - dưỡng ít + 9% (tuýp)","g":"1082692","s":"pbt65","qc":"100 tuýp/thùng","en":""},{"t":"Rêu khói trầm - dưỡng ít + 6% (tuýp)","g":"1082709","s":"rkt65","qc":"100 tuýp/thùng","en":""},{"t":"Vàng mơ - dưỡng ít + 9% (tuýp)","g":"1082738","s":"vm65","qc":"100 tuýp/thùng","en":""},{"t":"Vàng tro vàng khói - dưỡng ít + 9% (tuýp)","g":"1082758","s":"vtvk65","qc":"100 tuýp/thùng","en":""},{"t":"Xanh dương đen khói - dưỡng ít + 12% (tuýp)","g":"1082778","s":"xddk65","qc":"100 tuýp/thùng","en":""},{"t":"Đen tím - dưỡng ít + 6% (tuýp)","g":"1082719","s":"dtim65","qc":"100 tuýp/thùng","en":""},{"t":"Đỏ dâu - dưỡng ít + 9% (tuýp)","g":"1082678","s":"dd65","qc":"100 tuýp/thùng","en":""},{"t":"0/00","g":"1082755","s":"bk65","qc":"100/thùng","en":""},{"t":"0/45","g":"1082716","s":"dl65","qc":"100/thùng","en":""},{"t":"0/66","g":"1082722","s":"tt65","qc":"100/thùng","en":""},{"t":"0/88","g":"1082782","s":"xt65","qc":"100/thùng","en":""},{"t":"2/0","g":"1082733","s":"dt65","qc":"100/thùng","en":""},{"t":"5/0","g":"1082730","s":"nd65","qc":"100/thùng","en":""},{"t":"5/45","g":"1082774","s":"ndd65","qc":"100/thùng","en":""},{"t":"5/66","g":"1082726","s":"ntim65","qc":"100/thùng","en":""},{"t":"5/71","g":"1082785","s":"ntd65","qc":"100/thùng","en":""},{"t":"6/1","g":"1082666","s":"nxk65","qc":"100/thùng","en":""},{"t":"6/4","g":"1082770","s":"nht65","qc":"100/thùng","en":""},{"t":"6/43","g":"1082768","s":"ncd65","qc":"100/thùng","en":""},{"t":"6/77","g":"1082702","s":"ccl65","qc":"100/thùng","en":""},{"t":"7/0","g":"1082761","s":"hd65","qc":"100/thùng","en":""},{"t":"7/1","g":"1082659","s":"nks65","qc":"100/thùng","en":""},{"t":"7/44","g":"1082751","s":"ncg65","qc":"100/thùng","en":""},{"t":"7/45","g":"1082688","s":"drv65","qc":"100/thùng","en":""},{"t":"7/71","g":"1082792","s":"nl65","qc":"100/thùng","en":""},{"t":"7/77","g":"1082698","s":"cf65","qc":"100/thùng","en":""},{"t":"8/0","g":"1082670","s":"nb65","qc":"100/thùng","en":""},{"t":"8/1","g":"1082655","s":"ns65","qc":"100/thùng","en":""},{"t":"8/45","g":"1082681","s":"ndc65","qc":"100/thùng","en":""},{"t":"8/71","g":"1082805","s":"nxhd65","qc":"100/thùng","en":""},{"t":"9/1","g":"1082764","s":"nlak65","qc":"100/thùng","en":""},{"t":"Chùm tai nhuộm tóc (đôi)","g":"1082671","s":"chumtai","qc":"50 đôi/thùng","en":""},{"t":"Full dụng cụ nhuộm tóc (bộ)","g":"1082653","s":"fdc","qc":"500 bộ/thùng","en":""},{"t":"Kính bảo vệ mắt (cái)","g":"1082665","s":"kinh","qc":"50 cái/thùng","en":""},{"t":"Kẹp cá sấu cố định tóc (cái)","g":"1082676","s":"kepcasau","qc":"50 cái/thùng","en":""},{"t":"Kẹp vịt cố định tóc (cái)","g":"1082682","s":"kepvit","qc":"50 cái/thùng","en":""},{"t":"Lược nhuộm tóc (cái)","g":"1082660","s":"luoc","qc":"50 cái/thùng","en":""},{"t":"Áo choàng nhựa (cái)","g":"1082686","s":"aonhua","qc":"50 cái/thùng","en":""},{"t":"Áo choàng nilon (cái)","g":"1082690","s":"aonilon","qc":"50 cái/thùng","en":""},{"t":"Bát nhuộm tóc (cái)","g":"1082657","s":"bat","qc":"250 cái/thùng","en":""},{"t":"Bóc màu ziemlich (hộp)","g":"1082808","s":"bm","qc":"50 hộp/thùng","en":""},{"t":"Bóc đen ziemlich (tuýp)","g":"1082815","s":"bd","qc":"120 tuýp/thùng","en":""},{"t":"Combo siêu dưỡng (hộp)","g":"1082897","s":"sd","qc":"50 hộp/thùng","en":""},{"t":"Dầu gội khô 120ml (hộp)","g":"1090590","s":"dgk120ml","qc":"","en":""},{"t":"Dầu gội khô 20ml (hộp)","g":"1090588","s":"dgk20ml","qc":"","en":""},{"t":"Dầu gội khô 50ml (hộp)","g":"1090589","s":"dgk50ml","qc":"","en":""},{"t":"Dầu gội tím 100ml (lọ)","g":"1082736","s":"kv100ml","qc":"50 lọ/thùng","en":""},{"t":"Dầu gội tím 20ml (lọ)","g":"1082729","s":"kv20ml","qc":"100 lọ/thùng","en":""},{"t":"Dầu gội tím 50ml (lọ)","g":"1082732","s":"kv50ml","qc":"50 lọ/thùng","en":""},{"t":"Hũ ủ hồng ziemlich (hộp)","g":"1082752","s":"huhong","qc":"45 hộp/thùng","en":""},{"t":"Hũ ủ ngẫu nhiên (hộp)","g":"1082762","s":"hrd","qc":"50 hộp/thùng","en":""},{"t":"Hũ ủ tím ziemlich (hộp)","g":"1082757","s":"hutim","qc":"45 hộp/thùng","en":""},{"t":"Kem chống rát (lọ)","g":"1082783","s":"kcr","qc":"50 lọ/thùng","en":""},{"t":"Keratin ziemlich (lọ)","g":"1082767","s":"krt","qc":"100 lọ/thùng","en":""},{"t":"Khoá màu ziemlich (lọ)","g":"1082773","s":"km","qc":"50 lọ/thùng","en":""},{"t":"Nâng mạnh ziemlich (hộp)","g":"1082820","s":"nm","qc":"50 hộp/thùng","en":""},{"t":"Nâng nhẹ ziemlich (hộp)","g":"1082825","s":"nn","qc":"50 hộp/thùng","en":""},{"t":"Protein phục hồi hư tổn (lọ)","g":"1082779","s":"protein","qc":"100 lọ/thùng","en":""},{"t":"Tinh dầu 100ml (lọ)","g":"1082748","s":"td100ml","qc":"100 lọ/thùng","en":""},{"t":"Tinh dầu 10ml (lọ)","g":"1082740","s":"td10ml","qc":"100 lọ/thùng","en":""},{"t":"Trợ oxy 12% (lọ)","g":"1082724","s":"0.12","qc":"168 lọ/thùng","en":""},{"t":"Trợ oxy 3% (lọ)","g":"1082708","s":"0.03","qc":"168 lọ/thùng","en":""},{"t":"Trợ oxy 6% (lọ)","g":"1082714","s":"0.06","qc":"168 lọ/thùng","en":""},{"t":"Trợ oxy 9% (lọ)","g":"1082718","s":"0.09","qc":"168 lọ/thùng","en":""},{"t":"Tẩy ziemlich bé (hộp)","g":"1082798","s":"tb","qc":"50 hộp/thùng","en":""},{"t":"Tẩy ziemlich to (hộp)","g":"1082803","s":"tt","qc":"104 hộp/thùng","en":""},{"t":"Xịt dưỡng tóc 100ml (lọ)","g":"1082793","s":"xit100ml","qc":"50 lọ/thùng","en":""},{"t":"Xịt dưỡng tóc 30ml (lọ)","g":"1082788","s":"xit30ml","qc":"50 lọ/thùng","en":""},{"t":"Ủ ngẫu nhiên (gói)","g":"1082704","s":"ubio","qc":"600 gói/thùng","en":""},{"t":"Ủ ziemlich hồng (gói)","g":"1082694","s":"uhong","qc":"600 gói/thùng","en":""},{"t":"Ủ ziemlich tím (gói)","g":"1082699","s":"utim","qc":"600 gói/thùng","en":""},{"t":"Nước Hoa Blue Shirt - 10ML (lọ)","g":"1088305","s":"z10ml","qc":"","en":""},{"t":"Nước Hoa DARK BEAUTY - 10ML (lọ)","g":"1088291","s":"db10ml","qc":"","en":""},{"t":"Nước Hoa FIRST LOVE - 10ML (lọ)","g":"1088300","s":"fl10ml","qc":"","en":""},{"t":"Nước Hoa GIRL POWER - 10ML (lọ)","g":"1088301","s":"gp10ml","qc":"","en":""},{"t":"Nước Hoa JASMINE AMBER - 10ML (lọ)","g":"1088289","s":"ja10ml","qc":"","en":""},{"t":"Nước Hoa LADYKILLER - 10ML (lọ)","g":"1088295","s":"lk10ml","qc":"","en":""},{"t":"Nước Hoa VENUS - 10ML (lọ)","g":"1088297","s":"vn10ml","qc":"","en":""},{"t":"Nước Hoa Blue Shirt - 2ML (lọ)","g":"1088276","s":"z2ml","qc":"","en":""},{"t":"Nước Hoa DARK BEAUTY - 2ML (lọ)","g":"1088258","s":"db2ml","qc":"","en":""},{"t":"Nước Hoa FIRST LOVE - 2ML (lọ)","g":"1088267","s":"fl2ml","qc":"","en":""},{"t":"Nước Hoa GIRL POWER - 2ML (lọ)","g":"1088269","s":"gp2ml","qc":"","en":""},{"t":"Nước Hoa JASMINE AMBER - 2ML (lọ)","g":"1088256","s":"ja2ml","qc":"","en":""},{"t":"Nước Hoa LADYKILLER - 2ML (lọ)","g":"1088261","s":"lk2ml","qc":"","en":""},{"t":"Nước Hoa VENUS - 2ML (lọ)","g":"1088263","s":"vn2ml","qc":"","en":""},{"t":"Nước Hoa Blue Shirt - 30ML (lọ)","g":"1088323","s":"z30ml","qc":"","en":""},{"t":"Nước Hoa DARK BEAUTY - 30ML (lọ)","g":"1088313","s":"db30ml","qc":"","en":""},{"t":"Nước Hoa FIRST LOVE - 30ML (lọ)","g":"1088318","s":"fl30ml","qc":"","en":""},{"t":"Nước Hoa GIRL POWER - 30ML (lọ)","g":"1088319","s":"gp30ml","qc":"","en":""},{"t":"Nước Hoa JASMINE AMBER - 30ML (lọ)","g":"1088312","s":"ja30ml","qc":"","en":""},{"t":"Nước Hoa LADYKILLER - 30ML (lọ)","g":"1088315","s":"lk30ml","qc":"","en":""},{"t":"Nước Hoa VENUS - 30ML (lọ)","g":"1088316","s":"vn30ml","qc":"","en":""},{"t":"Sữa tắm Dark Beauty 500ml (chai)","g":"1088268","s":"stdb","qc":"48 chai/thùng","en":""},{"t":"Sữa tắm First Love (chai)","g":"1088275","s":"stfl","qc":"","en":""},{"t":"Sữa tắm Girl Power (chai)","g":"1088273","s":"stgp","qc":"","en":""},{"t":"Sữa tắm Jasmine Amber (chai)","g":"1088277","s":"stja","qc":"","en":""},{"t":"Sữa tắm Venus (chai)","g":"1088270","s":"stvn","qc":"","en":""}];
+var CATALOG = CATALOG_SG;
 function norm(s){return (s||'').replace(/\s+/g,' ').trim().toLowerCase();}
-var LS_KEY='cheng_tem_catalog_v1';
-function loadCatalog(){
-  try{ var s=localStorage.getItem(LS_KEY); if(s){ var a=JSON.parse(s); if(Array.isArray(a)&&a.length) return a; } }catch(e){}
-  return BUILTIN.map(function(c){return {t:c.t,g:c.g,s:c.s,qc:c.qc,en:c.en};});
-}
-var CATALOG = loadCatalog();
 var MAP = {};
-function saveCatalog(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(CATALOG)); }catch(e){ alert('Không lưu được (trình duyệt chặn lưu trữ).'); } rebuildCatalog(); }
-function rebuildCatalog(){
-  MAP={}; CATALOG.forEach(function(c){ MAP[norm(c.t)]=c; });
-  var dl=document.getElementById('prods'); if(dl){ dl.innerHTML=''; var frag=document.createDocumentFragment();
-    CATALOG.slice().sort(function(a,b){return a.t.localeCompare(b.t);}).forEach(function(c){ var o=document.createElement('option'); o.value=c.t; frag.appendChild(o); });
-    dl.appendChild(frag); }
-  mgrRender();
+function applyCatalog(){
+  var s=document.getElementById('src').value.trim();
+  CATALOG = (s==='Sài Gòn') ? CATALOG_SG : CATALOG_FULL;
+  MAP = {};
+  CATALOG.forEach(function(c){ MAP[norm(c.t)] = c; });
+  var dl=document.getElementById('prods'); dl.innerHTML='';
+  var frag=document.createDocumentFragment();
+  CATALOG.forEach(function(c){ var o=document.createElement('option'); o.value=c.t; frag.appendChild(o); });
+  dl.appendChild(frag);
+  document.querySelectorAll('#rows .c-ten').forEach(function(inp){ onTen(inp); });
 }
-function esc0(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function mgrAddOrUpdate(){
-  var t=document.getElementById('m_t').value.trim();
-  var en=document.getElementById('m_en').value.trim();
-  var g=document.getElementById('m_g').value.trim();
-  var s=document.getElementById('m_s').value.trim();
-  var qc=document.getElementById('m_qc').value.trim();
-  var editKey=document.getElementById('m_edit').value;
-  if(!t||!g){ alert('Bắt buộc nhập Tên tiếng Việt và Mã QR.'); return; }
-  var dup=CATALOG.findIndex(function(c){return norm(c.t)===norm(t);});
-  if(editKey){
-    var i=CATALOG.findIndex(function(c){return norm(c.t)===editKey;});
-    if(i>=0){ if(dup>=0&&dup!==i){ alert('Tên này đã có mã khác trong danh mục.'); return; }
-      CATALOG[i]={t:t,en:en,g:g,s:s,qc:qc}; }
-    document.getElementById('m_edit').value=''; document.getElementById('m_add').textContent='💾 Lưu vào danh mục';
-  } else {
-    if(dup>=0){ if(!confirm('Tên "'+t+'" đã có trong danh mục. Ghi đè?')) return; CATALOG[dup]={t:t,en:en,g:g,s:s,qc:qc}; }
-    else CATALOG.push({t:t,en:en,g:g,s:s,qc:qc});
-  }
-  document.getElementById('m_t').value='';document.getElementById('m_en').value='';document.getElementById('m_g').value='';document.getElementById('m_s').value='';document.getElementById('m_qc').value='';
-  saveCatalog();
+
+/* ====== Quản lý danh sách kho (dropdown, thêm/xóa, lưu localStorage) ====== */
+var KHO_DEFAULT = ['Mê Linh 1','Mê Linh 2','Âu Cơ','Sài Gòn','Hà Nội'];
+function loadKho(){
+  try{ var s=JSON.parse(localStorage.getItem('khoList')); if(Array.isArray(s)&&s.length) return s; }catch(e){}
+  return KHO_DEFAULT.slice();
 }
-function mgrEdit(key){
-  var c=CATALOG.find(function(x){return norm(x.t)===key;}); if(!c) return;
-  document.getElementById('m_t').value=c.t; document.getElementById('m_en').value=c.en||'';
-  document.getElementById('m_g').value=c.g||''; document.getElementById('m_s').value=c.s||''; document.getElementById('m_qc').value=c.qc||'';
-  document.getElementById('m_edit').value=key; document.getElementById('m_add').textContent='✏️ Cập nhật';
-  document.querySelector('.mgr').setAttribute('open','');
-  document.getElementById('m_t').focus();
+function saveKho(){ try{ localStorage.setItem('khoList', JSON.stringify(KHOS)); }catch(e){} }
+var KHOS = loadKho();
+function fillSel(sel, keep, fallback){
+  sel.innerHTML='';
+  KHOS.forEach(function(k){ var o=document.createElement('option'); o.value=k; o.textContent=k; sel.appendChild(o); });
+  if(KHOS.indexOf(keep)>=0) sel.value=keep;
+  else if(KHOS.indexOf(fallback)>=0) sel.value=fallback;
 }
-function mgrDel(key){
-  var c=CATALOG.find(function(x){return norm(x.t)===key;}); if(!c) return;
-  if(!confirm('Xoá "'+c.t+'" khỏi danh mục?')) return;
-  CATALOG=CATALOG.filter(function(x){return norm(x.t)!==key;}); saveCatalog();
+function renderKho(){
+  var src=document.getElementById('src'), dst=document.getElementById('dst');
+  fillSel(src, src.value||'Mê Linh 2', 'Mê Linh 2');
+  fillSel(dst, dst.value||'Âu Cơ', 'Âu Cơ');
+  togglePhieu();
 }
-function mgrReset(){ if(!confirm('Khôi phục về danh mục gốc? Mọi thay đổi trên trình duyệt này sẽ mất.')) return;
-  try{localStorage.removeItem(LS_KEY);}catch(e){} CATALOG=loadCatalog(); rebuildCatalog(); }
-function mgrExport(){
-  var blob=new Blob([JSON.stringify(CATALOG,null,1)],{type:'application/json'});
-  var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download='danh_muc_tem_kien.json'; a.click(); setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+function addKho(){
+  var v=document.getElementById('newkho').value.trim();
+  if(!v) return;
+  if(KHOS.indexOf(v)<0){ KHOS.push(v); saveKho(); }
+  document.getElementById('newkho').value='';
+  renderKho();
 }
-function mgrImport(ev){
-  var f=ev.target.files&&ev.target.files[0]; if(!f) return;
-  var r=new FileReader();
-  r.onload=function(){ try{ var a=JSON.parse(r.result);
-    if(!Array.isArray(a)||!a.length){ alert('File không hợp lệ.'); return; }
-    var ok=a.filter(function(c){return c&&c.t&&c.g;}).map(function(c){return {t:c.t,g:c.g,s:c.s||'',qc:c.qc||'',en:c.en||''};});
-    if(!ok.length){ alert('File không có sản phẩm hợp lệ (cần Tên + Mã QR).'); return; }
-    if(!confirm('Nhập '+ok.length+' sản phẩm, THAY danh mục hiện tại?')) return;
-    CATALOG=ok; saveCatalog();
-  }catch(e){ alert('Không đọc được file JSON.'); } };
-  r.readAsText(f); ev.target.value='';
+function delKho(){
+  var v=document.getElementById('src').value;
+  if(!v) return;
+  if(!confirm('Xóa kho "'+v+'" khỏi danh sách?')) return;
+  KHOS=KHOS.filter(function(k){return k!==v;});
+  saveKho();
+  renderKho();
 }
-function mgrRender(){
-  var tb=document.getElementById('m_list'); if(!tb) return;
-  var q=norm((document.getElementById('m_search')||{}).value||'');
-  var list=CATALOG.slice().sort(function(a,b){return a.t.localeCompare(b.t);});
-  var shown=list.filter(function(c){return !q||norm(c.t).indexOf(q)>=0||norm(c.en).indexOf(q)>=0||String(c.g).indexOf(q)>=0;});
-  tb.innerHTML=shown.map(function(c){var k=norm(c.t);
-    return '<tr><td>'+esc0(c.t)+'</td><td>'+esc0(c.en||'')+'</td><td>'+esc0(c.g||'')+'</td><td>'+esc0(c.s||'')+'</td><td>'+esc0(c.qc||'')+'</td>'+
-      '<td style="white-space:nowrap"><button class="mgredit" onclick="mgrEdit(\''+k.replace(/'/g,"\\'")+'\')">Sửa</button>'+
-      '<button class="mgrdel" onclick="mgrDel(\''+k.replace(/'/g,"\\'")+'\')">Xoá</button></td></tr>';}).join('');
-  document.getElementById('m_count').textContent='Tổng '+CATALOG.length+' sản phẩm'+(q?(' · hiển thị '+shown.length):'');
+function togglePhieu(){
+  var s=document.getElementById('src').value.trim();
+  document.getElementById('btnPhieu').style.display=(s && s!=='Sài Gòn')?'':'none';
 }
-var CATALOG_API='https://larkbot-laj5.onrender.com/tem-catalog';
-var ADMIN_KEY='cheng_tem_admin';
-function setCloud(msg,color){ var el=document.getElementById('m_cloud'); if(el){ el.textContent=msg; el.style.color=color||'#667085'; } }
-function fetchRemote(){
-  setCloud('⏳ Đang tải danh mục mới nhất từ server...','#667085');
-  fetch(CATALOG_API,{cache:'no-store'}).then(function(r){return r.json();}).then(function(a){
-    if(Array.isArray(a)&&a.length){
-      CATALOG=a.map(function(c){return {t:c.t,g:c.g,s:c.s||'',qc:c.qc||'',en:c.en||''};});
-      try{localStorage.setItem(LS_KEY,JSON.stringify(CATALOG));}catch(e){}
-      rebuildCatalog(); setCloud('✅ Đang dùng danh mục chung trên server ('+CATALOG.length+' SP).','#138d75');
-    } else { setCloud('ℹ️ Server chưa có danh mục chung — đang dùng danh mục trong máy. Bấm “Cập nhật lên link” để đăng.','#667085'); }
-  }).catch(function(){ setCloud('⚠️ Không kết nối được server (có thể đang ngủ) — đang dùng danh mục trong máy.','#b7791f'); });
+function setPage(sz){
+  var st=document.getElementById('pgstyle');
+  st.textContent = (sz==='a6') ? '@media print{@page{size:105mm 148mm;margin:0}}' : '@media print{@page{size:A4;margin:0}}';
 }
-function getAdminToken(){
-  var tk=''; try{tk=localStorage.getItem(ADMIN_KEY)||'';}catch(e){}
-  if(!tk){ tk=(prompt('Nhập MÃ QUẢN TRỊ để cập nhật danh mục lên link (chỉ chủ kho có mã này):')||'').trim();
-    if(!tk) return ''; try{localStorage.setItem(ADMIN_KEY,tk);}catch(e){} }
-  return tk;
-}
-function mgrPublish(){
-  var tk=getAdminToken(); if(!tk){ return; }
-  setCloud('⏳ Đang cập nhật lên server...','#667085');
-  fetch(CATALOG_API+'?token='+encodeURIComponent(tk),{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(CATALOG)})
-   .then(function(r){return r.json();}).then(function(d){
-     if(d.ok){ setCloud('✅ Đã cập nhật lên link ('+d.n+' SP). Người khác mở link (Ctrl+F5) sẽ thấy.','#138d75');
-       alert('✅ Đã cập nhật danh mục lên link ('+d.n+' sản phẩm).\nNCC mở link và tải lại (Ctrl+F5) sẽ thấy danh mục mới.'); }
-     else { setCloud('❌ '+(d.err||'lỗi'),'#c0392b');
-       if((d.err||'').indexOf('token')>=0){ try{localStorage.removeItem(ADMIN_KEY);}catch(e){} alert('Sai mã quản trị. Bấm lại để nhập mã đúng.'); }
-       else alert('Lỗi: '+(d.err||'?')); }
-   }).catch(function(){ setCloud('⚠️ Không kết nối được server (app có thể đang ngủ, thử lại sau ~30s).','#b7791f');
-     alert('Không kết nối được server. App Render có thể đang ngủ — thử lại sau ~30 giây.'); });
-}
-rebuildCatalog();
-fetchRemote();
 
 function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function nameHtml(ten){ return ten.split(' - ').map(function(p,i){return esc((i>0?'- ':'')+p.trim());}).join('<br>'); }
@@ -311,7 +232,6 @@ function addRow(v){
     '<td><input class="c-dvt" value="'+(v.dvt||'Thùng')+'"></td>'+
     '<td><input class="c-qc" placeholder="Vd: 45 hộp/thùng" value="'+(v.qc||'')+'"></td>'+
     '<td><input class="c-dt" placeholder="Vd: 30ml" value="'+(v.dt||'')+'"></td>'+
-    '<td><input class="c-lo" placeholder="Vd: L2607" value="'+(v.lo||'')+'"></td>'+
     '<td><input type="date" class="c-hsd" value="'+(v.hsd||'')+'"></td>'+
     '<td><input class="c-gc" placeholder="Vd: dễ vỡ..." value="'+(v.gc||'')+'"></td>'+
     '<td class="num"><input class="c-sl" type="number" min="0" step="1" value="'+(v.sl!=null?v.sl:1)+'"></td>'+
@@ -329,13 +249,12 @@ function fmtHSD(v){
 function genTem(){
   var src=document.getElementById('src').value.trim(), dst=document.getElementById('dst').value.trim();
   var route=(src&&dst)?(src+' → '+dst):(src||dst||'');
-  var trs=document.querySelectorAll('#rows tr'); var items=[]; var bad=[]; var miss=[];
+  var trs=document.querySelectorAll('#rows tr'); var items=[]; var bad=[];
   trs.forEach(function(tr){
     var ten=tr.querySelector('.c-ten').value.trim();
     var dvt=tr.querySelector('.c-dvt').value.trim()||'Thùng';
     var qc=tr.querySelector('.c-qc').value.trim();
     var dt=tr.querySelector('.c-dt').value.trim();
-    var lo=tr.querySelector('.c-lo').value.trim();
     var hsd=tr.querySelector('.c-hsd').value.trim();
     var gc=tr.querySelector('.c-gc').value.trim();
     var sl=parseInt(tr.querySelector('.c-sl').value,10)||0;
@@ -343,11 +262,9 @@ function genTem(){
     if(!ten||sl<=0) return;
     var m=MAP[norm(ten)];
     if(!m){ bad.push(ten); return; }
-    if(!lo || !hsd){ miss.push(m.t+(lo?'':' (thiếu Số lô)')+(hsd?'':' (thiếu HSD)')); return; }
     var isBox = /th[uùũ]ng/.test(norm(dvt));   // ĐVT = Thùng -> thùng nguyên
-    items.push({ten:m.t, en:m.en||"", g:m.g, s:m.s, qc:qc, dt:dt, lo:lo, hsd:hsd, gc:gc, dvt:dvt, sl:sl, grp:grp, isBox:isBox});
+    items.push({ten:m.t, en:m.en||"", g:m.g, s:m.s, qc:qc, dt:dt, hsd:hsd, gc:gc, dvt:dvt, sl:sl, grp:grp, isBox:isBox});
   });
-  if(miss.length){ alert('⚠️ Phải điền đủ SỐ LÔ SX và HSD mới in được tem.\n\nCác mã còn thiếu:\n- '+miss.join('\n- ')); return; }
   if(bad.length){ if(!confirm('Các mã CHƯA khớp danh mục (sẽ bỏ qua):\n- '+bad.join('\n- ')+'\n\nTiếp tục in phần còn lại?')) return; }
   if(items.length===0){ alert('Chưa có dòng hợp lệ (Tên phải chọn trong danh mục, Số lượng ≥ 1).'); return; }
 
@@ -367,42 +284,46 @@ function genTem(){
   order.forEach(function(key){ boxes.push({type:'mixed', grp:groups[key].grp, products:groups[key].products}); });
 
   var M=boxes.length;
+  var thermal = (src !== 'Sài Gòn');   // kho xuất khác Sài Gòn -> mỗi tem 1 trang A6 (máy in nhiệt)
+  setPage(thermal ? 'a6' : 'a4');
   var out=document.getElementById('print'); out.innerHTML='';
   var page=null, onPage=0;
   function newPage(){ page=document.createElement('div'); page.className='page'; out.appendChild(page); onPage=0; }
-  newPage();
+  function placeTem(tem){
+    if(thermal){ var w=document.createElement('div'); w.className='page6'; w.appendChild(tem); out.appendChild(w); }
+    else { if(onPage===4) newPage(); page.appendChild(tem); onPage++; }
+  }
+  if(!thermal) newPage();
 
   boxes.forEach(function(bx,bi){
-    if(onPage===4) newPage();
     var g=bi+1;
     var tem=document.createElement('div'); tem.className='tem';
 
     if(bx.type==='full'){
       var it=bx.it;
-      var longName=(it.en||it.ten).replace(/ - /g,' ').length>20;
+      var nLen=(it.en||it.ten).replace(/ - /g,' ').length;
+      var nameCls=nLen>26?' xs':(nLen>20?' sm':'');
       tem.innerHTML=
         '<div class="frame">'+
           '<div class="top"><span class="route">'+esc(route)+'</span><span class="thung">'+esc(it.dvt)+' '+bx.k+'/'+bx.n+'</span></div>'+
           '<hr class="divider">'+
           '<div class="qrwrap"><div class="qr"></div></div>'+
-          (it.s?('<div class="sku">SKU: '+esc(it.s)+'</div>'):'')+
-          '<div class="name'+(longName?' sm':'')+'">'+(it.en?esc(it.en):nameHtml(it.ten))+'</div>'+
+          '<div class="sku">SKU: '+esc(it.s||it.g)+'</div>'+
+          '<div class="name'+nameCls+'">'+(it.en?esc(it.en):nameHtml(it.ten))+'</div>'+
           (it.en?('<div class="nameEn">'+nameHtml(it.ten)+'</div>'):'')+
           '<div class="qc">'+esc(it.qc||'')+'</div>'+
           (it.dt?('<div class="dt">Dung tích: '+esc(it.dt)+'</div>'):'')+
           (it.gc?('<div class="gc">Ghi chú: '+esc(it.gc)+'</div>'):'')+
-          '<div class="dt">Số lô SX:'+(it.lo?(' '+esc(it.lo)):' __________')+'</div>'+
           '<div class="hsd">HSD:'+(it.hsd?(' '+esc(fmtHSD(it.hsd))):'<span class="line"></span>')+'</div>'+
           '<div class="kien">Kiện '+g+'/'+M+'</div>'+
         '</div>';
-      page.appendChild(tem); onPage++;
+      placeTem(tem);
       new QRCode(tem.querySelector('.qr'), {text:(it.g||it.s||it.ten), width:160, height:160, correctLevel:QRCode.CorrectLevel.M});
     } else {
       var rowsHtml = bx.products.map(function(pr){
-        var meta=pr.s?('SKU: '+esc(pr.s)):('G SKU: '+esc(pr.g));
+        var meta='SKU: '+esc(pr.s||pr.g);
         if(pr.dt) meta+=' · '+esc(pr.dt);
-        meta+=' · Lô '+(pr.lo?esc(pr.lo):'______');
-        meta+=' · HSD '+(pr.hsd?esc(fmtHSD(pr.hsd)):'__________');
+        if(pr.hsd) meta+=' · HSD '+esc(fmtHSD(pr.hsd));
         if(pr.gc) meta+=' · '+esc(pr.gc);
         return '<div class="mixrow"><div class="mixqr" data-qr="'+esc(pr.g||pr.s||pr.ten)+'"></div><div class="mixL">'+
                  '<div class="mixname">'+nameHtml(pr.ten)+(pr.en?(' <span style="font-weight:600;color:#555">('+esc(pr.en)+')</span>'):'')+'</div>'+
@@ -419,7 +340,7 @@ function genTem(){
           '<div class="mixlist">'+rowsHtml+'</div>'+
           '<div class="kien">Kiện '+g+'/'+M+'</div>'+
         '</div>';
-      page.appendChild(tem); onPage++;
+      placeTem(tem);
       tem.querySelectorAll('.mixqr').forEach(function(el){
         new QRCode(el, {text:el.getAttribute('data-qr'), width:140, height:140, correctLevel:QRCode.CorrectLevel.M});
       });
@@ -428,7 +349,58 @@ function genTem(){
   setTimeout(function(){ window.print(); }, 400);
 }
 
-// dòng mẫu
+/* ====== Phiếu xuất kho A4 (giống lệnh chuyển kho) ====== */
+function vnnum(n){ try{ return Number(n).toLocaleString('vi-VN'); }catch(e){ return String(n); } }
+function genPhieu(){
+  var src=document.getElementById('src').value.trim(), dst=document.getElementById('dst').value.trim();
+  var trs=document.querySelectorAll('#rows tr'); var rows=[]; var bad=[];
+  trs.forEach(function(tr){
+    var ten=tr.querySelector('.c-ten').value.trim();
+    var dvt=tr.querySelector('.c-dvt').value.trim()||'Thùng';
+    var qc=tr.querySelector('.c-qc').value.trim();
+    var gc=tr.querySelector('.c-gc').value.trim();
+    var sl=parseInt(tr.querySelector('.c-sl').value,10)||0;
+    if(!ten||sl<=0) return;
+    var m=MAP[norm(ten)];
+    if(!m){ bad.push(ten); return; }
+    rows.push({name:m.t, dvt:dvt, qc:qc, gc:gc, sl:sl});
+  });
+  if(bad.length){ if(!confirm('Các mã CHƯA khớp danh mục (sẽ bỏ qua):\n- '+bad.join('\n- ')+'\n\nTiếp tục?')) return; }
+  if(rows.length===0){ alert('Chưa có dòng hợp lệ (Tên phải chọn trong danh mục, Số lượng ≥ 1).'); return; }
+
+  var d=new Date();
+  var ng=('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear();
+  var tot=0;
+  var body=rows.map(function(r,i){
+    tot+=r.sl;
+    return '<tr><td class="c">'+(i+1)+'</td><td>'+esc(r.name)+'</td><td class="c">'+esc(r.dvt)+'</td><td class="c">'+esc(r.qc)+'</td><td class="r">'+vnnum(r.sl)+'</td><td>'+esc(r.gc)+'</td></tr>';
+  }).join('');
+  var html=
+    '<div class="slippage">'+
+      '<h2>PHIẾU XUẤT KHO</h2>'+
+      '<div class="pngay">Ngày lập phiếu: '+ng+'</div>'+
+      '<div class="pmeta"><b>Kho xuất:</b> '+esc(src)+'</div>'+
+      '<div class="pmeta"><b>Kho nhập:</b> '+esc(dst)+'</div>'+
+      '<table class="slptbl"><thead><tr>'+
+        '<th style="width:10mm">STT</th><th>Tên sản phẩm</th><th style="width:16mm">ĐVT</th>'+
+        '<th style="width:26mm">Quy cách</th><th style="width:24mm">Số lượng</th><th style="width:30mm">Ghi chú</th>'+
+      '</tr></thead><tbody>'+
+        body+
+        '<tr class="tong"><td colspan="4">TỔNG CỘNG</td><td class="r">'+vnnum(tot)+'</td><td></td></tr>'+
+      '</tbody></table>'+
+      '<div class="slpsign">'+
+        '<div class="col"><div class="lbl">NGƯỜI GIAO (Kho xuất)</div>Ký, ghi rõ họ tên</div>'+
+        '<div class="col"><div class="lbl">NGƯỜI NHẬN (Kho nhập)</div>Ký, ghi rõ họ tên</div>'+
+      '</div>'+
+    '</div>';
+  setPage('a4');
+  var out=document.getElementById('print'); out.innerHTML=html;
+  setTimeout(function(){ window.print(); }, 300);
+}
+
+// khởi tạo dropdown kho + danh mục + dòng mẫu
+renderKho();
+applyCatalog();
 addRow({ten:'Hũ ủ hồng ziemlich (hộp)',dvt:'Thùng',qc:'45 hộp/thùng',sl:5});
 addRow({ten:'Trợ oxy 6% (lọ)',dvt:'Lọ',qc:'168 lọ/thùng',sl:20,grp:'A'});
 addRow({ten:'Trợ oxy 9% (lọ)',dvt:'Lọ',qc:'168 lọ/thùng',sl:15,grp:'A'});
