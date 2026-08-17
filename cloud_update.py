@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
-# Chạy trên GitHub Actions 18h30 / 19h / 19h30 VN mỗi ngày (chỉ chạy trong khung 18h25-23h):
-# đồng bộ Gobox->Lark, dựng board, gửi cảnh báo Lark.
+# Chạy trên GitHub Actions 20:00 VN mỗi ngày: đồng bộ Gobox->Lark, dựng board, gửi cảnh báo Lark.
 import os,json,re,urllib.request,urllib.parse,urllib.error,datetime,math,time
 from collections import defaultdict
 LARK_HOST='https://open.larksuite.com'; GB='https://api.gobox.asia'
 def gopen(req,timeout=60,tries=6):
-    # gọi HTTP có retry khi 429/5xx (Gobox hay chặn tốc độ)
+    # gọi HTTP có retry khi 429/5xx (Gobox hay chặn tốc độ; Lark đôi khi 503)
     for i in range(tries):
         try:
             return urllib.request.urlopen(req,timeout=timeout)
@@ -22,7 +21,7 @@ WID='32'; COVER=45; MELINH_RPT='https://melinh-lark-relay.hungnv21295.workers.de
 
 def ltoken():
     r=urllib.request.Request(LARK_HOST+'/open-apis/auth/v3/tenant_access_token/internal',data=json.dumps({'app_id':APP_ID,'app_secret':APP_SECRET}).encode(),headers={'Content-Type':'application/json'},method='POST')
-    return json.load(urllib.request.urlopen(r,timeout=30))['tenant_access_token']
+    return json.load(gopen(r,30))['tenant_access_token']
 def gt(v):
     if isinstance(v,list): return ''.join(x.get('text','') for x in v if isinstance(x,dict)) or (str(v[0]) if v else '')
     if isinstance(v,dict): return v.get('value') or v.get('text')
@@ -34,14 +33,7 @@ def fv(v):
     except: return 0
 def lpost(tok,path,body):
     r=urllib.request.Request(LARK_HOST+path,data=json.dumps(body).encode(),headers={'Authorization':'Bearer '+tok,'Content-Type':'application/json'},method='POST')
-    d=json.load(urllib.request.urlopen(r,timeout=60))
-    if isinstance(d,dict) and d.get('code') not in (0,None):
-        msg='LARK API LỖI: code=%s msg=%s path=%s'%(d.get('code'),d.get('msg'),path[:90])
-        print('  !! '+msg)
-        # Lỗi khi GHI/XOÁ -> raise cho workflow đỏ (tránh âm thầm mất data như vụ đầy bảng)
-        if any(k in path for k in ('batch_create','batch_delete','batch_update')):
-            raise RuntimeError(msg)
-    return d
+    return json.load(gopen(r,60))
 def lsearch(tok,tid,fields):
     out=[];pt=None
     while True:
@@ -74,19 +66,14 @@ def _t2g_maps(tok):
     return sku2g,sku2name,name2g
 def _norm(s): return re.sub(r'\s+',' ',(s or '').strip()).lower()
 KALLE_KEEP=('dark beauty','first love','venus','jasmine amber','girl power','blue shirt','ladykiller','lady killer')
-KALLE_TOP_SKIP=('ngẫu nhiên','bst')   # KHÔNG đưa vào TOP bán chạy Kalle
 def kalle_alert_ok(name,hang):
     # Kalle: chỉ cảnh báo hết hàng cho 7 mùi; mùi khác bỏ qua. Hãng khác luôn cảnh báo.
     if (hang or '').strip()!='Kalle': return True
     n=_norm(name)
     return any(k in n for k in KALLE_KEEP)
-def kalle_top_ok(name):
-    # bỏ gói sữa tắm ngẫu nhiên / vial ngẫu nhiên / bst ngẫu nhiên / bst khỏi top Kalle
-    n=_norm(name)
-    return not any(k in n for k in KALLE_TOP_SKIP)
 def _ck_tensp(tok):
     r=urllib.request.Request(LARK_HOST+f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_CK}/fields?page_size=200',headers={'Authorization':'Bearer '+tok})
-    for f in json.load(urllib.request.urlopen(r,timeout=40))['data']['items']:
+    for f in json.load(gopen(r,40))['data']['items']:
         if f['field_name']=='Tên SP': return {_norm(o['name']):o['name'] for o in (f.get('property') or {}).get('options',[])}
     return {}
 def _cells(tr): return [re.sub('<[^>]+>','',c).replace('&amp;','&').strip() for c in re.findall(r'<td[^>]*>(.*?)</td>',tr,re.S)]
@@ -146,7 +133,8 @@ def sync_gobox(ltok):
     auco=defaultdict(float); ml2gb=defaultdict(float)
     for r in lines:
         if c2s.get(r['code'])==499: continue  # loại đơn hủy
-        auco[str(r['gsku'])]+=r.get('quantity',0)  # BỎ tách MLP: mọi đơn kho 32 = Âu Cơ
+        if c2p.get(r['code'])==MLP: ml2gb[str(r['gsku'])]+=r.get('quantity',0)
+        else: auco[str(r['gsku'])]+=r.get('quantity',0)
     # --- Mê Linh 2 từ báo cáo (Bước 1-4) ---
     s1a,s1b,s2=parse_report(NGAY)
     sku2g,sku2name,name2g=_t2g_maps(ltok); tensp=_ck_tensp(ltok)
@@ -227,12 +215,11 @@ def compute(tok):
         f=it['fields'];g=gt(f.get('G SKU'))
         if not g: continue
         inv[str(g)]={'name':gt(f.get('Tên sản phẩm')),'cat':gt(f.get('Phân loại')) or '','hang':(gt(f.get('Hãng')) or '—').strip() or '—','qc':fv(f.get('Quy cách')),'ve':fv(f.get('Hàng dự kiến về')),'ac':fv(f.get('Tồn kho Âu Cơ')),'ml1':fv(f.get('Kho Mê Linh 1')),'ml2':fv(f.get('Kho Mê Linh 2'))}
-    xk=lsearch(tok,T_XK,['G SKU','Số lượng','Kho xuất','Ngày đóng gói','Loại'])
+    xk=lsearch(tok,T_XK,['G SKU','Số lượng','Kho xuất','Ngày đóng gói'])
     salesw=defaultdict(lambda:defaultdict(float));days=set();now=datetime.datetime.now().timestamp()*1000;q7=defaultdict(float)
     for it in xk:
         f=it['fields'];g=gt(f.get('G SKU'));q=f.get('Số lượng') or 0;k=f.get('Kho xuất');d=f.get('Ngày đóng gói')
         if isinstance(d,(int,float)): days.add(d)
-        if (gt(f.get('Loại')) or '').strip()!='Xuất Bán hàng': continue   # CHỈ tính hàng bán cho tốc độ xuất (bỏ chuyển kho/gia công/đóng box)
         if g and k: salesw[g][k]+=q
         if g and isinstance(d,(int,float)) and (now-d)<=7*86400*1000: q7[g]+=q
     NDW=max(1,len(days));NDM=31
@@ -372,10 +359,9 @@ def send_day_reports(tok,ngay):
         inv[str(g)]={'name':gt(f.get('Tên sản phẩm')) or g,'hang':(gt(f.get('Hãng')) or '—').strip(),'pl':(gt(f.get('Phân loại')) or '').strip(),'ton':fv(f.get('Tồn kho Âu Cơ'))+fv(f.get('Kho Mê Linh 1'))+fv(f.get('Kho Mê Linh 2')),'tb':bool(f.get('Thông báo hết hàng'))}
     from collections import defaultdict as _dd
     day=_dd(float);s14=_dd(float)
-    for it in lsearch(tok,T_XK,['G SKU','Số lượng','Ngày đóng gói','Loại']):
+    for it in lsearch(tok,T_XK,['G SKU','Số lượng','Ngày đóng gói']):
         f=it['fields'];g=gt(f.get('G SKU'));q=f.get('Số lượng') or 0;dt=f.get('Ngày đóng gói')
         if not g or not isinstance(dt,(int,float)): continue
-        if (gt(f.get('Loại')) or '').strip()!='Xuất Bán hàng': continue   # CHỈ tính hàng bán; bỏ Xuất lưu kho/Gia công/Đóng Box
         g=str(g)
         if dt==DATE_MS: day[g]+=q
         dd=(DATE_MS-dt)/86400000
@@ -383,7 +369,7 @@ def send_day_reports(tok,ngay):
     rate=lambda g:s14.get(g,0)/14
     dleft=lambda g:(round(inv[g]['ton']/rate(g),1) if rate(g)>0 else None)
     chg=[{'name':inv[g]['name'],'qty':int(day[g]),'ton':int(inv[g]['ton']),'rate':round(rate(g),1),'days':dleft(g)} for g in sorted(day,key=lambda x:-day[x]) if inv.get(g,{}).get('hang')=='Cheng' and inv.get(g,{}).get('pl') in DYE_PL][:10]
-    kal=[{'name':inv[g]['name'],'qty':int(day[g]),'ton':int(inv[g]['ton']),'rate':round(rate(g),1),'days':dleft(g)} for g in sorted(day,key=lambda x:-day[x]) if inv.get(g,{}).get('hang')=='Kalle' and kalle_top_ok(inv.get(g,{}).get('name'))][:10]
+    kal=[{'name':inv[g]['name'],'qty':int(day[g]),'ton':int(inv[g]['ton']),'rate':round(rate(g),1),'days':dleft(g)} for g in sorted(day,key=lambda x:-day[x]) if inv.get(g,{}).get('hang')=='Kalle'][:10]
     risk=[]
     for g,v in inv.items():
         if g in TRIO or v.get('tb') or v['hang'] not in ('Cheng','Kalle') or v['pl']=='NVL': continue
@@ -416,42 +402,34 @@ def sync_hanghoan(ltok,ngay):
     DATE_MS=int(datetime.datetime.strptime(ngay,'%Y-%m-%d').replace(tzinfo=datetime.timezone(datetime.timedelta(hours=7))).timestamp()*1000)
     gtok=gbtoken()
     from collections import defaultdict as _dd
-    KHO=[('32','Kho Âu Cơ'),('65','Kho Mê Linh 2')]   # lấy hoàn của CẢ 2 kho
-    qty=_dd(float)   # (tên kho, sku) -> số lượng
-    for wid,khoten in KHO:
-        pg=1
-        while pg<=80:
-            url=GB+'/open/api/orders?'+urllib.parse.urlencode({'warehouse_id':wid,'is_return':1,'limit':200,'page':pg,'include[]':'items'})
-            try:
-                d=json.load(gopen(urllib.request.Request(url,headers={'Authorization':'Bearer '+gtok,'Accept':'application/json'}),60))
-            except Exception as e:
-                print('  hoàn kho %s lỗi: %s'%(wid,e)); break
-            data=d.get('data',[])
-            if not data: break
-            recent=False
-            for r in data:
-                dmy=(r.get('update_time') or '')[:10]
-                try: dd,mm,yy=dmy.split('-'); iso=f'{yy}-{mm}-{dd}'
-                except: continue
-                if iso>=ngay: recent=True
-                if r.get('return_status_warehouse')==1 and iso==ngay:
-                    for it in (r.get('items') or {}).get('data',[]):
-                        sk=(it.get('sku_code') or '').strip().lower(); q=it.get('quantity') or 0
-                        if sk: qty[(khoten,sk)]+=q
-            if not recent and pg>4: break
-            if not d.get('meta',{}).get('cursor',{}).get('next'): break
-            pg+=1
+    qty=_dd(float);pg=1
+    while pg<=80:
+        url=GB+'/open/api/orders?'+urllib.parse.urlencode({'warehouse_id':WID,'is_return':1,'limit':200,'page':pg,'include[]':'items'})
+        d=json.load(gopen(urllib.request.Request(url,headers={'Authorization':'Bearer '+gtok,'Accept':'application/json'}),60))
+        data=d.get('data',[])
+        if not data: break
+        recent=False
+        for r in data:
+            dmy=(r.get('update_time') or '')[:10]
+            try: dd,mm,yy=dmy.split('-'); iso=f'{yy}-{mm}-{dd}'
+            except: continue
+            if iso>=ngay: recent=True
+            if r.get('return_status_warehouse')==1 and iso==ngay:
+                for it in (r.get('items') or {}).get('data',[]):
+                    sk=(it.get('sku_code') or '').strip().lower(); q=it.get('quantity') or 0
+                    if sk: qty[sk]+=q
+        if not recent and pg>4: break
+        if not d.get('meta',{}).get('cursor',{}).get('next'): break
+        pg+=1
     sku2g,_,_=_t2g_maps(ltok); recs=[];un=0
-    for (khoten,sk),q in qty.items():
+    for sk,q in qty.items():
         g=sku2g.get(sk)
         if not g: un+=1; continue
-        if q>0: recs.append({'Ngày đóng gói':DATE_MS,'G SKU':str(g),'Số lượng':int(q),'Kho xuất':khoten,'Ghi chú':'Hàng hoàn (Gobox)'})
+        if q>0: recs.append({'Ngày đóng gói':DATE_MS,'G SKU':str(g),'Số lượng':int(q),'Ghi chú':'Hàng hoàn (Gobox)'})
     ex=[it['record_id'] for it in lsearch(ltok,T_HOAN,['Ngày đóng gói']) if it['fields'].get('Ngày đóng gói')==DATE_MS]
     for i in range(0,len(ex),500): lpost(ltok,f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_HOAN}/records/batch_delete',{'records':ex[i:i+500]})
     for i in range(0,len(recs),500): lpost(ltok,f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_HOAN}/records/batch_create',{'records':[{'fields':x} for x in recs[i:i+500]]})
-    tong=int(sum(x['Số lượng'] for x in recs))
-    ac=int(sum(x['Số lượng'] for x in recs if x['Kho xuất']=='Kho Âu Cơ'))
-    print('  Hàng hoàn %s: %d dòng / %d sp (Âu Cơ %d · Mê Linh 2 %d) — xoá cũ %d, chưa map %d'%(ngay,len(recs),tong,ac,tong-ac,len(ex),un))
+    print('  Hàng hoàn %s: %d SKU / %d sp (xoá cũ %d, chưa map %d)'%(ngay,len(recs),int(sum(x['Số lượng'] for x in recs)),len(ex),un))
     return len(recs)
 
 if __name__=='__main__':
