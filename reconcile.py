@@ -19,8 +19,8 @@ TZ = datetime.timezone(datetime.timedelta(hours=7))
 HOST      = os.getenv("LARK_HOST", "https://open.larksuite.com")
 APP_ID    = os.getenv("LARK_APP_ID",  "cli_aa8d66518d619ed1")
 APP_SEC   = os.getenv("LARK_APP_SEC") or os.getenv("LARK_APP_SECRET") or ""   # KHONG ghi cung: doc tu secret
-BASE_APP  = os.getenv("LARK_BASE_APP", "SA7ebfOdLaUJ5fsVILIl1QGag7b")   # app_token cua Base
-SAOKE_TABLE = os.getenv("GOBOX_SAOKE_TABLE", "tblQ4FASSV9Y6Ewl")
+BASE_APP  = os.getenv("LARK_BASE_APP", "NIHqbl89eaYvFqsXvB1lxV58gGc")   # Base SePay truc tiep (realtime)   # app_token cua Base
+SAOKE_TABLE = os.getenv("GOBOX_SAOKE_TABLE", "tbls8T5gqGcnBUYi")   # bang "Bien dong so du - Sepay"
 CONFIRM_CHAT = os.getenv("LARK_CONFIRM_CHAT_ID", "") or "oc_d284fd22a122a942ba6985414ecf0352"
 
 F_SK_AMOUNT  = os.getenv("SAOKE_AMOUNT_FIELD", "số tiền")
