@@ -1,5 +1,5 @@
 <!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Báo cáo bán hàng 01/09/2026</title>
+<title>Báo cáo bán hàng 02/09/2026</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:#0f1729;color:#e6edf6;padding:18px;max-width:1100px;margin:0 auto}
@@ -30,7 +30,7 @@ body{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:#0f
 .empty{color:#7d8db0;font-size:13px;padding:8px}
 .foot{text-align:center;color:#5b6b8c;font-size:11px;margin-top:16px}
 </style></head><body>
-<div class="head"><h1>📊 Báo cáo bán hàng — Kho</h1><div class="sub">Ngày 01/09/2026 · Top bán chạy & cảnh báo sắp hết · tốc độ bán TB 2 tuần</div></div>
+<div class="head"><h1>📊 Báo cáo bán hàng — Kho</h1><div class="sub">Ngày 02/09/2026 · Top bán chạy & cảnh báo sắp hết · tốc độ bán TB 2 tuần</div></div>
 <div class="grid">
  <div class="card"><h2>🏆 Top bán chạy <span class="tag c">CHENG · thuốc nhuộm</span></h2><div id="cheng"></div></div>
  <div class="card"><h2>🏆 Top bán chạy <span class="tag k">KALLE</span></h2><div id="kalle"></div></div>
@@ -38,7 +38,7 @@ body{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:#0f
 <div class="card risk" style="margin-top:16px"><h2>⚠️ Sắp hết trong 1 tuần tới</h2><div class="empty" style="margin-bottom:6px">Tốc độ bán cao, tồn hiện không đủ bán 1 tuần — cần nhập thêm.</div><div id="risk"></div></div>
 <div class="foot">Tự động cập nhật sau mỗi lần xuất kho · Kho Cheng/Kalle</div>
 <script>
-var D={"date": "01/09/2026", "cheng": [{"name": "3 gói nhuộm bọt - nâu đen (túi)", "qty": 113, "ton": 19660, "rate": 208.8, "days": 94.2}, {"name": "3 gói nhuộm bọt - đen tuyền (túi)", "qty": 81, "ton": 2933, "rate": 165.1, "days": 17.8}, {"name": "5 gói nhuộm bọt - nâu đen (hộp)", "qty": 69, "ton": 6359, "rate": 152.5, "days": 41.7}, {"name": "3 gói nhuộm bọt - trà lạnh (túi)", "qty": 62, "ton": 9691, "rate": 120.8, "days": 80.2}, {"name": "3 gói nhuộm bọt - nâu sữa (túi)", "qty": 36, "ton": 14622, "rate": 54.9, "days": 266.2}, {"name": "10 gói nhuộm bọt - trà lạnh (hộp)", "qty": 36, "ton": 4780, "rate": 39.1, "days": 122.1}, {"name": "10 gói nhuộm bọt - mocha (hộp)", "qty": 35, "ton": 2126, "rate": 36.5, "days": 58.2}, {"name": "5 gói nhuộm bọt - trà lạnh (hộp)", "qty": 34, "ton": 5903, "rate": 56.4, "days": 104.6}, {"name": "3 gói nhuộm bọt - mocha (túi)", "qty": 34, "ton": 18870, "rate": 60.1, "days": 314.1}, {"name": "3 gói nhuộm bọt - nâu tây (túi)", "qty": 31, "ton": 26137, "rate": 59.0, "days": 443.0}], "kalle": [{"name": "Vial 2ml ngẫu nhiên (cái)", "qty": 13, "ton": -1009, "rate": 23.3, "days": -43.3}, {"name": "Nước Hoa DARK BEAUTY - 10ML (lọ)", "qty": 10, "ton": -100, "rate": 18.6, "days": -5.4}, {"name": "Bst vial ngẫu nhiên (hộp)", "qty": 8, "ton": -61, "rate": 18.8, "days": -3.2}, {"name": "Box Dark Beauty 10ml + Sữa tắm Dark Beauty", "qty": 6, "ton": 7121, "rate": 10.4, "days": 682.8}, {"name": "Nước Hoa LADYKILLER - 2ML (lọ)", "qty": 5, "ton": 1990, "rate": 2.1, "days": 960.7}, {"name": "Nước Hoa Blue Shirt - 10ML (lọ)", "qty": 5, "ton": 1174, "rate": 1.9, "days": 608.7}, {"name": "Box Dark Beauty 30ml + Sữa tắm Dark Beauty", "qty": 4, "ton": 5897, "rate": 24.6, "days": 239.3}, {"name": "Nước Hoa DARK BEAUTY - 30ML (lọ)", "qty": 3, "ton": 2709, "rate": 10.8, "days": 251.2}, {"name": "Nước Hoa Blue Shirt - 2ML (lọ)", "qty": 3, "ton": 1336, "rate": 6.1, "days": 220.0}, {"name": "Nước Hoa LADYKILLER - 10ML (lọ)", "qty": 3, "ton": 987, "rate": 6.1, "days": 162.6}], "risk": [{"name": "Bóc đen ziemlich (tuýp)", "rate": 6.9, "ton": 45, "days": 6.5}]};
+var D={"date": "02/09/2026", "cheng": [], "kalle": [], "risk": [{"name": "Bóc đen ziemlich (tuýp)", "rate": 6.1, "ton": 42, "days": 6.8}]};
 function fmt(n){return n.toLocaleString('vi-VN')}
 function sellers(id,arr,cls){var el=document.getElementById(id);if(!arr.length){el.innerHTML='<div class=empty>Không có dữ liệu</div>';return}
  var mx=Math.max.apply(null,arr.map(function(x){return x.qty}))||1;
