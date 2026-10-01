@@ -1,6 +1,10 @@
 name: Daily kho update (18:30-22:30 VN, retry 30p)
 on:
   schedule:
+    # Gio UTC. GitHub thuong chay tre 3-8 tieng so voi lich nay.
+    # Them 2 moc som (17:30, 18:00 VN) de khi bi tre van roi vao khung xu ly.
+    - cron: '30 10 * * *'
+    - cron: '0 11 * * *'
     - cron: '30 11 * * *'
     - cron: '0 12 * * *'
     - cron: '30 12 * * *'
