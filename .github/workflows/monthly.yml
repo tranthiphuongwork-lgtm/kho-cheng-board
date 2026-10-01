@@ -20,6 +20,7 @@ jobs:
           LARK_APP_SECRET: ${{ secrets.LARK_APP_SECRET }}
           LARK_APP_TOKEN: ${{ secrets.LARK_APP_TOKEN }}
           LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK }}
+          LARK_VERIFY_TOKEN: ${{ secrets.LARK_VERIFY_TOKEN }}
           REPORT_PERIOD: month
         run: python weekly_report.py
       - name: Commit monthly_report.html
