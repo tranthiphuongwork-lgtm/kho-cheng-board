@@ -8,7 +8,7 @@ Chạy ngày 15,17,25,27:
 Âu Cơ điền tới ROT_AC_DAYS ngày. Chuyển TRÒN THÙNG theo Quy cách.
 Bảng chi tiết có cột: SL chuyển · số thùng · Tồn tối thiểu kho xuất · Tồn còn lại.
 """
-import os, math, json, html, datetime, urllib.request
+import os, math, json, html, datetime, calendar, urllib.request
 from collections import defaultdict
 import cloud_update as M
 
@@ -35,14 +35,21 @@ def build_rows(tok):
             'ac': M.fv(f.get('Tồn kho Âu Cơ')), 'ml1': M.fv(f.get('Kho Mê Linh 1')),
             'ml2': M.fv(f.get('Kho Mê Linh 2')),
         }
-    xk = M.lsearch(tok, M.T_XK, ['G SKU','Số lượng','Kho xuất','Ngày đóng gói'])
-    salesw = defaultdict(lambda: defaultdict(float)); days = set()
+    xk = M.lsearch(tok, M.T_XK, ['G SKU','Số lượng','Kho xuất','Ngày đóng gói','Ghi chú'])
+    salesw = defaultdict(lambda: defaultdict(float)); days = set(); gop_mo = set()
     for it in xk:
         f = it['fields']; g = M.gt(f.get('G SKU')); q = f.get('Số lượng') or 0; k = f.get('Kho xuất')
         d = f.get('Ngày đóng gói')
-        if isinstance(d, (int, float)): days.add(d)
-        if g and k: salesw[str(g)][k] += q
-    NDW = max(1, len(days)); NDM = 31
+        if isinstance(d, (int, float)):
+            _dte = datetime.datetime.fromtimestamp(d/1000, tz=VN).date()
+            if M.is_gop(f): gop_mo.add((_dte.year, _dte.month))
+            else: days.add(d)
+        if g and k: salesw[str(g)][k] += q     # dong gop van la so that -> van cong vao tong
+    days = {d for d in days
+            if (datetime.datetime.fromtimestamp(d/1000, tz=VN).date().year,
+                datetime.datetime.fromtimestamp(d/1000, tz=VN).date().month) not in gop_mo}
+    # Moi thang da nen phai tinh du so ngay cua thang do, neu khong toc do ban bi thoi phong.
+    NDW = max(1, len(days) + sum(calendar.monthrange(y,m)[1] for y,m in gop_mo)); NDM = 31
     def rate(g, kho, shp_key):
         wk = salesw.get(g, {}).get(kho, 0)
         mo = (may.get(g, {}) or {}).get(shp_key, 0) if isinstance(may.get(g), dict) else 0
