@@ -11,7 +11,8 @@ import os, json, re, urllib.request, datetime
 LARK_HOST='https://open.larksuite.com'
 APP_ID=os.environ['LARK_APP_ID']; APP_SECRET=os.environ['LARK_APP_SECRET']
 BASE=os.environ['LARK_APP_TOKEN']; WEBHOOK=os.environ['LARK_WEBHOOK']
-T_SP='tbl7PSQh3Lq5Tlxy'; T_XK='tblIHtLsM4QTMMQJ'; T_VE='tbl2uluTqdOrzYqo'  # Dự kiến hàng về
+T_SP='tbl7PSQh3Lq5Tlxy'; T_XK='tblIHtLsM4QTMMQJ'
+T_DH='tblnQKdGRrjX3J18'   # Đặt hàng — nguồn của 'hàng chuẩn bị về'
 TRIO=['1082704','1082694','1082699']
 DYE_PL={'Dưỡng ít','Dưỡng vừa','Dưỡng nhiều','3 gói bọt','5 gói bọt','10 gói','Màu lẻ'}
 KALLE_KEEP=('dark beauty','first love','venus','jasmine amber','girl power','blue shirt','ladykiller','lady killer')
@@ -19,6 +20,10 @@ KALLE_TOP_SKIP=('ngẫu nhiên','bst')   # không đưa vào TOP Kalle
 PERIOD=(os.getenv('REPORT_PERIOD') or 'week').strip().lower()
 # Nhóm nhận thêm (ngoài webhook gốc), gửi bằng app bot theo chat_id. Nhiều nhóm cách nhau dấu phẩy.
 EXTRA_CHATS=[c.strip() for c in (os.getenv('LARK_EXTRA_CHATS') or 'oc_d8c13cd908cb6b5c536cf7bc71b8dcbc').split(',') if c.strip()]
+# Nhóm duyệt trước (Bot của Phương) + địa chỉ bot để nhận lệnh xác nhận
+CONFIRM_CHAT=(os.getenv('LARK_CONFIRM_CHAT') or 'oc_d284fd22a122a942ba6985414ecf0352').strip()
+BOT_URL=(os.getenv('LARK_BOT_URL') or 'https://larkbot-laj5.onrender.com').rstrip('/')
+BOT_TOKEN=(os.getenv('LARK_VERIFY_TOKEN') or '').strip()
 
 def _norm(s): return re.sub(r'\s+',' ',(s or '').strip()).lower()
 def kalle_alert_ok(name,hang):
@@ -49,6 +54,12 @@ def lpost(tok,path,body):
     r=urllib.request.Request(LARK_HOST+path,data=json.dumps(body).encode(),
         headers={'Authorization':'Bearer '+tok,'Content-Type':'application/json'},method='POST')
     return json.load(urllib.request.urlopen(r,timeout=60))
+TAG_GOP='Tổng tháng (đã gộp)'   # dấu của dòng TỔNG THÁNG do condense_xk.py tạo
+def is_gop(f):
+    """True nếu là dòng TỔNG THÁNG (đã nén): mang số của CẢ THÁNG nhưng chỉ đứng ở 1 ngày
+    (ngày cuối tháng). Phải xử lý riêng ở mọi phép tính theo ngày, và không được xoá nhầm."""
+    return TAG_GOP in (gt(f.get('Ghi chú')) or '')
+
 def lsearch(tok,tid,fields):
     out=[];pt=None
     while True:
@@ -58,22 +69,41 @@ def lsearch(tok,tid,fields):
         if d.get('has_more'): pt=d['page_token']
         else: break
     return out
+def _num(v):
+    if isinstance(v,dict) and 'value' in v:
+        x=v['value']; v=x[0] if isinstance(x,list) and x else 0
+    if isinstance(v,list): v=v[0] if v else 0
+    if isinstance(v,dict): v=v.get('value') or 0
+    try: return float(str(v).replace(',',''))
+    except Exception: return 0.0
+
 def load_incoming(tok):
-    # Bảng "Dự kiến hàng về" -> map tên sản phẩm (chuẩn hoá) -> {qty tổng, ngày về sớm nhất}
+    """Hàng chuẩn bị về = cột 'SL chưa về' của bảng Đặt hàng (số còn lại của đơn).
+    Tách 2 loại vì ý nghĩa rất khác nhau:
+      qty  = đơn ĐÃ ĐẶT NCC   -> hàng thật sự đang trên đường về
+      pend = đơn CHƯA ĐẶT     -> mới lên đơn trong bảng, NCC chưa nhận, hàng CHƯA về
+    """
     from collections import defaultdict
-    m=defaultdict(lambda:{'qty':0,'date':None})
-    for it in lsearch(tok,T_VE,['Ngày dự kiến về','Tên sản phẩm','Số lượng']):
+    m=defaultdict(lambda:{'qty':0.0,'pend':0.0,'date':None})
+    for it in lsearch(tok,T_DH,['Tên sản phẩm','SL chưa về','Tình trạng đặt hàng','Ngày nhận hàng dự kiến']):
         f=it['fields']; nm=gt(f.get('Tên sản phẩm'))
         if not nm: continue
-        k=_norm(nm); m[k]['qty']+=(f.get('Số lượng') or 0); d=f.get('Ngày dự kiến về')
-        if isinstance(d,(int,float)) and (m[k]['date'] is None or d<m[k]['date']): m[k]['date']=d
+        left=_num(f.get('SL chưa về'))
+        if left<=0: continue
+        k=_norm(nm); st=(gt(f.get('Tình trạng đặt hàng')) or '').strip().lower()
+        if 'đã đặt' in st:
+            m[k]['qty']+=left
+            d=f.get('Ngày nhận hàng dự kiến')
+            if isinstance(d,(int,float)) and (m[k]['date'] is None or d<m[k]['date']): m[k]['date']=d
+        else:
+            m[k]['pend']+=left
     return m
 def ve_of(inc,name):
     ik=inc.get(_norm(name))
-    if not ik or not ik['qty']: return None
+    if not ik or (not ik['qty'] and not ik['pend']): return None
     d=ik['date']
     ds=(datetime.datetime.fromtimestamp(d/1000,tz=datetime.timezone(datetime.timedelta(hours=7))).strftime('%d/%m') if d else None)
-    return {'qty':int(ik['qty']),'date':ds}
+    return {'qty':int(ik['qty']),'pend':int(ik['pend']),'date':ds}
 
 TPL=r'''<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Báo cáo bán hàng __KIND__ __RANGE__</title>
@@ -126,7 +156,12 @@ sellers('cheng',D.cheng,'bc');sellers('kalle',D.kalle,'bk');
 var rk=document.getElementById('risk');
 if(!D.risk.length){rk.innerHTML='<div class=empty>Không có mã nào dưới 1 tháng 🎉</div>'}else{
  rk.innerHTML=D.risk.map(function(x){var c=x.days<7?'cr':(x.days<14?'wn':'ye');
-  var ve=x.ve?('<div style="font-size:11px;color:#34d399;margin-top:2px">📦 Dự kiến về <b>+'+fmt(x.ve.qty)+'</b>'+(x.ve.date?(' · '+x.ve.date):'')+'</div>'):('<div style="font-size:11px;color:#f87171;margin-top:2px">📦 Chưa có hàng về</div>');
+  var ve=(function(){var v=x.ve;
+    if(!v) return '<div style="font-size:11px;color:#f87171;margin-top:2px">📦 Chưa có đơn đặt nào</div>';
+    var s='';
+    if(v.qty) s+='<div style="font-size:11px;color:#34d399;margin-top:2px">📦 Đã đặt, chờ về <b>+'+fmt(v.qty)+'</b>'+(v.date?(' · dự kiến '+v.date):'')+'</div>';
+    if(v.pend) s+='<div style="font-size:11px;color:#fbbf24;margin-top:2px">📝 Đã lên đơn nhưng CHƯA đặt NCC: <b>'+fmt(v.pend)+'</b></div>';
+    return s||'<div style="font-size:11px;color:#f87171;margin-top:2px">📦 Chưa có hàng về</div>';})();
   return '<div class="ri '+c+'"><div class=nm>'+x.name+ve+'</div><div class=meta>bán ~<b>'+fmt(x.rate)+'</b>/ngày · tồn <b>'+fmt(x.ton)+'</b></div><div class="dd '+c+'">'+x.days+'<div style="font-size:9px;font-weight:600;color:#9fb0d0">ngày</div></div></div>'}).join('')}
 </script></body></html>'''
 
@@ -168,15 +203,18 @@ def main():
                      'ton':fv(f.get('Tồn kho Âu Cơ'))+fv(f.get('Kho Mê Linh 1'))+fv(f.get('Kho Mê Linh 2')),
                      'tb':bool(f.get('Thông báo hết hàng'))}
     from collections import defaultdict as _dd
-    per=_dd(float); s14=_dd(float)
-    for it in lsearch(tok,T_XK,['G SKU','Số lượng','Ngày đóng gói']):
+    per=_dd(float); s14=_dd(float); d14=set()
+    for it in lsearch(tok,T_XK,['G SKU','Số lượng','Ngày đóng gói','Ghi chú']):
         f=it['fields'];g=gt(f.get('G SKU'));q=f.get('Số lượng') or 0;dt=f.get('Ngày đóng gói')
         if not g or not isinstance(dt,(int,float)): continue
-        g=str(g)
-        if LO<=dt<=HI: per[g]+=q
+        g=str(g); gop=is_gop(f)
+        # Bao cao TUAN: bo dong tong thang (no ganh so ca thang, roi vao tuan chua ngay cuoi thang).
+        # Bao cao THANG: GIU lai, vi neu thang do da nen thi dong tong chinh la du lieu cua thang.
+        if LO<=dt<=HI and (is_month or not gop): per[g]+=q
         dd=(NOW_MS-dt)/86400000
-        if 0<=dd<14: s14[g]+=q
-    rate=lambda g:s14.get(g,0)/14
+        if 0<=dd<14 and not gop: s14[g]+=q; d14.add(dt)
+    ND14=max(1,len(d14))   # chia cho so ngay THUC CO du lieu chi tiet, khong co dinh 14
+    rate=lambda g:s14.get(g,0)/ND14
     dleft=lambda g:(round(inv[g]['ton']/rate(g),1) if rate(g)>0 else None)
     chg=[{'name':inv[g]['name'],'qty':int(per[g]),'ton':int(inv[g]['ton']),'rate':round(rate(g),1),'days':dleft(g)}
          for g in sorted(per,key=lambda x:-per[x]) if inv.get(g,{}).get('hang')=='Cheng' and inv.get(g,{}).get('pl') in DYE_PL][:10]
@@ -205,15 +243,34 @@ def main():
           'header':{'title':{'tag':'plain_text','content':('🗓️' if is_month else '📅')+' Báo cáo bán hàng '+kind.lower()},'template':('purple' if is_month else 'turquoise')},
           'elements':[{'tag':'div','text':{'tag':'lark_md','content':body}},
                       {'tag':'action','actions':[{'tag':'button','text':{'tag':'plain_text','content':'Mở báo cáo '+kind.lower()},'type':'primary','url':url}]}]}
-    # 1) Webhook nhóm gốc
-    try: urllib.request.urlopen(urllib.request.Request(WEBHOOK,data=json.dumps({'msg_type':'interactive','card':card_obj}).encode(),headers={'Content-Type':'application/json'},method='POST'),timeout=30)
-    except Exception as e: print('gửi webhook lỗi:',e)
-    # 2) App bot -> các nhóm khác theo chat_id
-    for cid in EXTRA_CHATS:
+    # ---- LUỒNG DUYỆT ----
+    # Gửi nhóm 'Bot của Phương' TRƯỚC, kèm nút xác nhận. Chỉ khi bấm nút thì bot mới
+    # chuyển tiếp sang nhóm 'CNC | Báo kho TMDT'. Thiếu LARK_VERIFY_TOKEN -> quay về cách cũ.
+    if BOT_TOKEN:
+        from urllib.parse import urlencode
+        q=urlencode({'token':BOT_TOKEN,'k':('month' if is_month else 'week'),'r':rng,
+                     'c':str(tot_ch),'ka':str(tot_ka),'n':str(len(risk)),'u':url})
+        approve=BOT_URL+'/report-approve?'+q
+        card_cf=json.loads(json.dumps(card_obj))
+        card_cf['header']['title']['content']='🕵️ DUYỆT: '+card_cf['header']['title']['content']
+        card_cf['elements'].append({'tag':'div','text':{'tag':'lark_md',
+            'content':'_Kiểm tra xong bấm nút dưới để gửi sang nhóm **CNC | Báo kho TMDT**._'}})
+        card_cf['elements'].append({'tag':'action','actions':[{'tag':'button',
+            'text':{'tag':'plain_text','content':'✅ Xác nhận gửi nhóm Báo kho TMDT'},
+            'type':'danger','url':approve}]})
         try:
-            res=send_card_chat(tok,cid,card_obj)
-            print('gửi nhóm %s:'%cid, res.get('code'), res.get('msg'))
-        except Exception as e: print('gửi nhóm %s lỗi:'%cid, e)
+            res=send_card_chat(tok,CONFIRM_CHAT,card_cf)
+            print('gửi nhóm duyệt %s:'%CONFIRM_CHAT, res.get('code'), res.get('msg'))
+        except Exception as e: print('gửi nhóm duyệt lỗi:', e)
+    else:
+        print('!! Thiếu secret LARK_VERIFY_TOKEN -> gửi thẳng như cũ, KHÔNG qua bước duyệt.')
+        try: urllib.request.urlopen(urllib.request.Request(WEBHOOK,data=json.dumps({'msg_type':'interactive','card':card_obj}).encode(),headers={'Content-Type':'application/json'},method='POST'),timeout=30)
+        except Exception as e: print('gửi webhook lỗi:',e)
+        for cid in EXTRA_CHATS:
+            try:
+                res=send_card_chat(tok,cid,card_obj)
+                print('gửi nhóm %s:'%cid, res.get('code'), res.get('msg'))
+            except Exception as e: print('gửi nhóm %s lỗi:'%cid, e)
 
 if __name__=='__main__':
     main()
