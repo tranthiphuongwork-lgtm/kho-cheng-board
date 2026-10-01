@@ -18,6 +18,7 @@ H='https://open.larksuite.com'
 APP=os.environ['LARK_APP_ID']; SEC=os.environ['LARK_APP_SECRET']; BASE=os.environ['LARK_APP_TOKEN']
 T_XK='tblIHtLsM4QTMMQJ'
 TAG='Tổng tháng (đã gộp)'
+BK_PREFIX='XK_backup_'   # moi thang mot bang: XK_backup_YYYY-MM
 VN=datetime.timezone(datetime.timedelta(hours=7))
 DRY_RUN=(os.getenv('DRY_RUN') or '').strip() in ('1','true','yes')
 
@@ -46,6 +47,44 @@ def num(v):
     if isinstance(v,list): v=v[0] if v else 0
     try: return float(str(v).replace(',',''))
     except: return 0.0
+
+def list_tables(t):
+    out=[]; pt=None
+    while True:
+        url=f'/open-apis/bitable/v1/apps/{BASE}/tables?page_size=100'+(('&page_token='+pt) if pt else '')
+        d=api(t,'GET',url)
+        if d.get('_http') or d.get('code') not in (0,None): raise SystemExit('Liệt kê bảng lỗi: %s'%d)
+        out+=d['data'].get('items',[])
+        if d['data'].get('has_more'): pt=d['data']['page_token']
+        else: break
+    return out
+
+def ensure_backup_table(t, name):
+    """Tra ve (table_id, vua_tao_moi). Neu bang da co thi dung lai bang do."""
+    for it in list_tables(t):
+        if it['name']==name: return it['table_id'], False
+    # Cot dau tien la cot chinh -> phai la kieu van ban.
+    body={'table':{'name':name,'fields':[
+        {'field_name':'G SKU','type':1},
+        {'field_name':'Ngày đóng gói','type':5},
+        {'field_name':'Số lượng','type':2},
+        {'field_name':'Kho xuất','type':1},
+        {'field_name':'Loại','type':1},
+        {'field_name':'Ghi chú','type':1},
+    ]}}
+    d=api(t,'POST',f'/open-apis/bitable/v1/apps/{BASE}/tables',body)
+    if d.get('_http') or d.get('code')!=0: raise SystemExit('Tạo bảng backup lỗi: %s'%d)
+    return d['data']['table_id'], True
+
+def write_backup(t, tid, rows):
+    """Ghi cac dong chi tiet vao bang backup. Tra ve so dong da ghi thuc te."""
+    n=0
+    for i in range(0,len(rows),500):
+        d=api(t,'POST',f'/open-apis/bitable/v1/apps/{BASE}/tables/{tid}/records/batch_create',
+              {'records':[{'fields':r} for r in rows[i:i+500]]})
+        if d.get('_http') or d.get('code')!=0: raise SystemExit('Ghi backup lỗi: %s'%d)
+        n+=len(d['data']['records']); time.sleep(0.3)
+    return n
 
 def search_all(t):
     out=[]; pt=None
@@ -78,7 +117,7 @@ def main():
     print('== DỒN NÉN tháng %02d/%d =='%(mo,y))
     items=search_all(t)
     existing={}   # (kho,loai,g) -> (record_id, sl) của dòng tổng tháng này
-    aging=defaultdict(float); del_ids=[]
+    aging=defaultdict(float); del_ids=[]; bk_rows=[]
     for it in items:
         f=it['fields']; d=f.get('Ngày đóng gói')
         if not isinstance(d,(int,float)) or not (lo<=d<=hi): continue
@@ -86,12 +125,26 @@ def main():
         if TAG in gc:
             existing[(kho,loai,g)]=(it['record_id'], num(f.get('Số lượng')))
         else:
-            aging[(kho,loai,g)]+=num(f.get('Số lượng')); del_ids.append(it['record_id'])
+            sl=num(f.get('Số lượng'))
+            aging[(kho,loai,g)]+=sl; del_ids.append(it['record_id'])
+            bk_rows.append({'G SKU':str(g),'Ngày đóng gói':int(d),'Số lượng':int(sl),
+                            'Kho xuất':kho,'Loại':loai,'Ghi chú':gc})
     print('  Chi tiết cần gộp: %d dòng -> %d nhóm (dòng tổng đã có: %d)'%(len(del_ids),len(aging),len(existing)))
     if not del_ids:
         print('  Không có chi tiết để nén cho tháng này. Xong.'); return
     if DRY_RUN:
-        print('  DRY_RUN: không sửa Base.'); return
+        print('  DRY_RUN: không sửa Base (và không tạo backup).'); return
+
+    # ---- BACKUP TRUOC KHI DONG/XOA ----
+    bk_name='%s%04d-%02d'%(BK_PREFIX,y,mo)
+    bk_tid,is_new=ensure_backup_table(t,bk_name)
+    n_bk=write_backup(t,bk_tid,bk_rows)
+    print('  Backup -> bảng "%s" (%s): đã ghi %d dòng'
+          %(bk_name,'vừa tạo mới' if is_new else 'đã có sẵn, ghi thêm',n_bk))
+    if n_bk!=len(del_ids):
+        raise SystemExit('DỪNG LẠI: backup %d dòng nhưng cần xoá %d dòng — không khớp. '
+                         'Không sửa và không xoá gì cả.'%(n_bk,len(del_ids)))
+
     upd=[]; new=[]
     for (kho,loai,g),sl in aging.items():
         if (kho,loai,g) in existing:
@@ -116,7 +169,8 @@ def main():
         if d.get('code')==0: dele+=len(del_ids[i:i+500])
         else: print('  delete lỗi:',d)
         time.sleep(0.3)
-    print('>> XONG tháng %02d/%d: cập nhật %d + tạo %d dòng tổng, xoá %d chi tiết.'%(mo,y,len(upd),len(new),dele))
+    print('>> XONG tháng %02d/%d: backup %d dòng vào "%s", cập nhật %d + tạo %d dòng tổng, xoá %d chi tiết.'
+          %(mo,y,n_bk,bk_name,len(upd),len(new),dele))
 
 
 if __name__=='__main__':
