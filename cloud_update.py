@@ -201,6 +201,62 @@ def sync_gobox(ltok):
     if unmapped: print('  chưa map:',unmapped[:10])
     return NGAY,{'status':'done','auco':auco_n,'ml2':ml2_n,'ck':len(ck_recs),'unmapped':len(unmapped),'total':len(xk_recs)+len(ck_recs)}
 
+
+def _list_tables(tok):
+    out=[];pt=None
+    while True:
+        u=LARK_HOST+f'/open-apis/bitable/v1/apps/{BASE}/tables?page_size=100'+(('&page_token='+pt) if pt else '')
+        r=urllib.request.Request(u,headers={'Authorization':'Bearer '+tok})
+        d=json.load(urllib.request.urlopen(r,timeout=60)).get('data') or {}
+        out+=d.get('items',[])
+        if d.get('has_more'): pt=d['page_token']
+        else: break
+    return out
+
+def _months_between(lo_ms,hi_ms):
+    """Tap (nam,thang) ma khoang thoi gian di qua."""
+    vn=datetime.timezone(datetime.timedelta(hours=7))
+    a=datetime.datetime.fromtimestamp(lo_ms/1000,tz=vn).date()
+    b=datetime.datetime.fromtimestamp(hi_ms/1000,tz=vn).date()
+    out=set(); y,m=a.year,a.month
+    while (y,m)<=(b.year,b.month):
+        out.add((y,m))
+        m+=1
+        if m>12: m=1; y+=1
+    return out
+
+def load_backup_details(tok,lo_ms,hi_ms):
+    """Thang da nen thi chi tiet nam o bang XK_backup_YYYY-MM -> doc lai tu do.
+    Tra ve (danh_sach_ban_ghi, tap_thang_da_co_ban_luu)."""
+    want=_months_between(lo_ms,hi_ms)
+    tabs=None; rows=[]; have=set()
+    for (y,m) in sorted(want):
+        nm='XK_backup_%04d-%02d'%(y,m)
+        if tabs is None:
+            try: tabs=_list_tables(tok)
+            except Exception as e:
+                print('  khong liet ke duoc bang:',e); return [],set()
+        tid=next((t['table_id'] for t in tabs if t['name']==nm),None)
+        if not tid: continue
+        try:
+            r=lsearch(tok,tid,['G SKU','Số lượng','Ngày đóng gói'])
+        except Exception as e:
+            print('  doc %s loi: %s'%(nm,e)); continue
+        rows+=r; have.add((y,m))
+        print('  + lay lai %d dong chi tiet tu bang %s'%(len(r),nm))
+    return rows,have
+
+def _vnday(ms):
+    """Quy ve NGAY theo gio VN. Bang Xuat kho co dong luu ca gio phut (vd 16:00:22),
+    neu dem theo moc thoi gian thi 1 ngay bi tinh thanh hang chuc 'ngay' -> mau so sai."""
+    vn=datetime.timezone(datetime.timedelta(hours=7))
+    return datetime.datetime.fromtimestamp(ms/1000,tz=vn).date()
+
+def _ym(ms):
+    vn=datetime.timezone(datetime.timedelta(hours=7))
+    d=datetime.datetime.fromtimestamp(ms/1000,tz=vn).date()
+    return (d.year,d.month)
+
 def shopee_rates(tok):
     out=lsearch(tok,T_CK,['Kho nhập','Kho xuất','G SKU','Số lượng','Ngày'])
     now=datetime.datetime.now().timestamp()*1000; res={}
@@ -241,13 +297,11 @@ def compute(tok):
         if isinstance(d,(int,float)):
             _dte=datetime.datetime.fromtimestamp(d/1000,tz=VNTZ).date()
             if gop: gop_mo.add((_dte.year,_dte.month))
-            else: days.add(d)
+            else: days.add(_dte)
         if g and k: salesw[g][k]+=q            # dong gop van la so that -> van cong vao tong
         if g and not gop and isinstance(d,(int,float)) and (now-d)<=7*86400*1000: q7[g]+=q
     # Bo ngay chi tiet nam trong thang da nen (tranh dem 2 lan)
-    days={d for d in days
-          if (datetime.datetime.fromtimestamp(d/1000,tz=VNTZ).date().year,
-              datetime.datetime.fromtimestamp(d/1000,tz=VNTZ).date().month) not in gop_mo}
+    days={d for d in days if (d.year,d.month) not in gop_mo}
     # MAU SO = so ngay THUC SU duoc du lieu bao phu. Moi thang da nen phai tinh du so ngay cua
     # thang do; neu khong NDW tut xuong vai ngay va toc do ban bi thoi phong hang chuc lan.
     NDW=max(1,len(days)+sum(calendar.monthrange(y,m)[1] for y,m in gop_mo));NDM=31
@@ -387,7 +441,9 @@ def send_day_reports(tok,ngay):
         inv[str(g)]={'name':gt(f.get('Tên sản phẩm')) or g,'hang':(gt(f.get('Hãng')) or '—').strip(),'pl':(gt(f.get('Phân loại')) or '').strip(),'ton':fv(f.get('Tồn kho Âu Cơ'))+fv(f.get('Kho Mê Linh 1'))+fv(f.get('Kho Mê Linh 2')),'tb':bool(f.get('Thông báo hết hàng'))}
     from collections import defaultdict as _dd
     day=_dd(float);s14=_dd(float);d14=set()
-    for it in lsearch(tok,T_XK,['G SKU','Số lượng','Ngày đóng gói','Ghi chú']):
+    # Thang da nen -> lay lai chi tiet tu bang XK_backup_YYYY-MM, neu khong toc do 14 ngay se ve 0.
+    bk_rows,_bk=load_backup_details(tok,DATE_MS-14*86400000,DATE_MS)
+    for it in list(lsearch(tok,T_XK,['G SKU','Số lượng','Ngày đóng gói','Ghi chú']))+bk_rows:
         f=it['fields']
         if is_gop(f): continue   # dong tong thang khong phai so ban cua 1 ngay
         g=gt(f.get('G SKU'));q=f.get('Số lượng') or 0;dt=f.get('Ngày đóng gói')
@@ -395,7 +451,7 @@ def send_day_reports(tok,ngay):
         g=str(g)
         if dt==DATE_MS: day[g]+=q
         dd=(DATE_MS-dt)/86400000
-        if 0<=dd<14: s14[g]+=q; d14.add(dt)
+        if 0<=dd<14: s14[g]+=q; d14.add(_vnday(dt))
     ND14=max(1,len(d14))   # chia cho so ngay THUC CO du lieu chi tiet, khong co dinh 14
     rate=lambda g:s14.get(g,0)/ND14
     dleft=lambda g:(round(inv[g]['ton']/rate(g),1) if rate(g)>0 else None)
