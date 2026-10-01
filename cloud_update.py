@@ -44,6 +44,13 @@ def lpost(tok,path,body):
     r=urllib.request.Request(LARK_HOST+path,data=json.dumps(body).encode(),headers={'Authorization':'Bearer '+tok,'Content-Type':'application/json'},method='POST')
     return json.load(gopen(r,60))
 TAG_GOP='Tổng tháng (đã gộp)'   # dấu của dòng TỔNG THÁNG do condense_xk.py tạo
+LOAI_BAN='Xuất Bán hàng'   # CHI loai nay moi la doanh so
+def is_ban(f):
+    """Chi 'Xuất Bán hàng' moi tinh vao toc do ban.
+    'Xuất lưu kho' (chuyen vao luu kho), 'Xuất Gia công', 'Xuất Hủy hàng',
+    'Xuất đóng Box' deu KHONG phai ban -> gop vao se thoi phong toc do ~32%."""
+    return gt(f.get('Loại'))==LOAI_BAN
+
 def is_gop(f):
     """True nếu là dòng TỔNG THÁNG (đã nén): mang số của CẢ THÁNG nhưng chỉ đứng ở 1 ngày
     (ngày cuối tháng). Phải xử lý riêng ở mọi phép tính theo ngày, và không được xoá nhầm."""
@@ -239,7 +246,7 @@ def load_backup_details(tok,lo_ms,hi_ms):
         tid=next((t['table_id'] for t in tabs if t['name']==nm),None)
         if not tid: continue
         try:
-            r=lsearch(tok,tid,['G SKU','Số lượng','Ngày đóng gói'])
+            r=lsearch(tok,tid,['G SKU','Số lượng','Ngày đóng gói','Loại'])
         except Exception as e:
             print('  doc %s loi: %s'%(nm,e)); continue
         rows+=r; have.add((y,m))
@@ -288,7 +295,7 @@ def compute(tok):
         f=it['fields'];g=gt(f.get('G SKU'))
         if not g: continue
         inv[str(g)]={'name':gt(f.get('Tên sản phẩm')),'cat':gt(f.get('Phân loại')) or '','hang':(gt(f.get('Hãng')) or '—').strip() or '—','qc':fv(f.get('Quy cách')),'ve':fv(f.get('Hàng dự kiến về')),'ac':fv(f.get('Tồn kho Âu Cơ')),'ml1':fv(f.get('Kho Mê Linh 1')),'ml2':fv(f.get('Kho Mê Linh 2'))}
-    xk=lsearch(tok,T_XK,['G SKU','Số lượng','Kho xuất','Ngày đóng gói','Ghi chú'])
+    xk=lsearch(tok,T_XK,['G SKU','Số lượng','Kho xuất','Ngày đóng gói','Ghi chú','Loại'])
     salesw=defaultdict(lambda:defaultdict(float));days=set();now=datetime.datetime.now().timestamp()*1000;q7=defaultdict(float)
     gop_mo=set()   # cac thang da bi nen (nam, thang)
     for it in xk:
@@ -298,8 +305,9 @@ def compute(tok):
             _dte=datetime.datetime.fromtimestamp(d/1000,tz=VNTZ).date()
             if gop: gop_mo.add((_dte.year,_dte.month))
             else: days.add(_dte)
-        if g and k: salesw[g][k]+=q            # dong gop van la so that -> van cong vao tong
-        if g and not gop and isinstance(d,(int,float)) and (now-d)<=7*86400*1000: q7[g]+=q
+        ban=is_ban(f)   # chi tinh doanh so, bo Xuat luu kho / Gia cong / Huy hang
+        if g and k and ban: salesw[g][k]+=q
+        if g and ban and not gop and isinstance(d,(int,float)) and (now-d)<=7*86400*1000: q7[g]+=q
     # Bo ngay chi tiet nam trong thang da nen (tranh dem 2 lan)
     days={d for d in days if (d.year,d.month) not in gop_mo}
     # MAU SO = so ngay THUC SU duoc du lieu bao phu. Moi thang da nen phai tinh du so ngay cua
@@ -443,9 +451,10 @@ def send_day_reports(tok,ngay):
     day=_dd(float);s14=_dd(float);d14=set()
     # Thang da nen -> lay lai chi tiet tu bang XK_backup_YYYY-MM, neu khong toc do 14 ngay se ve 0.
     bk_rows,_bk=load_backup_details(tok,DATE_MS-14*86400000,DATE_MS)
-    for it in list(lsearch(tok,T_XK,['G SKU','Số lượng','Ngày đóng gói','Ghi chú']))+bk_rows:
+    for it in list(lsearch(tok,T_XK,['G SKU','Số lượng','Ngày đóng gói','Ghi chú','Loại']))+bk_rows:
         f=it['fields']
         if is_gop(f): continue   # dong tong thang khong phai so ban cua 1 ngay
+        if not is_ban(f): continue   # chi tinh Xuat Ban hang
         g=gt(f.get('G SKU'));q=f.get('Số lượng') or 0;dt=f.get('Ngày đóng gói')
         if not g or not isinstance(dt,(int,float)): continue
         g=str(g)
