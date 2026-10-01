@@ -3,6 +3,15 @@
 import os,json,re,urllib.request,urllib.parse,urllib.error,datetime,math,time
 from collections import defaultdict
 LARK_HOST='https://open.larksuite.com'; GB='https://api.gobox.asia'
+VNTZ=datetime.timezone(datetime.timedelta(hours=7))
+def biz_now():
+    """Giờ VN đã lùi 6 tiếng.
+    GitHub Actions thường chạy trễ 3–8 tiếng so với lịch 18:30; có hôm sang tận 1–3h sáng.
+    Lùi 6 tiếng để những lần chạy sau nửa đêm vẫn được tính cho NGÀY LÀM VIỆC HÔM TRƯỚC,
+    thay vì bị bỏ qua và mất trắng dữ liệu cả ngày."""
+    return datetime.datetime.now(VNTZ)-datetime.timedelta(hours=6)
+def biz_date():
+    return biz_now().date().isoformat()
 def gopen(req,timeout=60,tries=6):
     # gọi HTTP có retry khi 429/5xx (Gobox hay chặn tốc độ; Lark đôi khi 503)
     for i in range(tries):
@@ -109,7 +118,7 @@ def gb_pending(gtok,ngay):
     return pend,total
 
 def sync_gobox(ltok):
-    NGAY=datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7))).date().isoformat()
+    NGAY=biz_date()
     vn=datetime.timezone(datetime.timedelta(hours=7)); DATE_MS=int(datetime.datetime.strptime(NGAY,'%Y-%m-%d').replace(tzinfo=vn).timestamp()*1000)
     if any(it['fields'].get('Ngày đóng gói')==DATE_MS and gt(it['fields'].get('Loại'))=='Xuất Bán hàng' for it in lsearch(ltok,T_XK,['Ngày đóng gói','Loại'])):
         return NGAY,{'status':'already'}
@@ -265,7 +274,7 @@ def compute(tok):
 def build_index(rows):
     base=os.path.dirname(os.path.abspath(__file__))
     tpl=open(os.path.join(base,'board_template.html'),encoding='utf-8').read()
-    today=datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7))).strftime('%d/%m/%Y')
+    today=biz_now().strftime('%d/%m/%Y')
     html=tpl.replace('__CC__','45').replace('__CK__','45').replace('__DATE__',today).replace('__DATA__',json.dumps(rows,ensure_ascii=False))
     open(os.path.join(base,'index.html'),'w',encoding='utf-8').write(html)
 
@@ -433,11 +442,12 @@ def sync_hanghoan(ltok,ngay):
     return len(recs)
 
 if __name__=='__main__':
-    vn=datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7)))
-    mins=vn.hour*60+vn.minute
-    if not (18*60+25 <= mins <= 23*60):
-        print('Ngoài khung 18h30–23h VN (%02d:%02d) -> bỏ qua.'%(vn.hour,vn.minute))
+    vn=datetime.datetime.now(VNTZ); b=biz_now(); bmins=b.hour*60+b.minute
+    # Khung hop le: 18h25 toi 06h00 sang hom sau (gio VN thuc te).
+    if bmins < 12*60+25:
+        print('Ngoài khung 18h25 VN → 06h00 sáng hôm sau (bây giờ %02d:%02d) -> bỏ qua.'%(vn.hour,vn.minute))
         raise SystemExit
+    print('Giờ VN %02d:%02d — xử lý cho ngày làm việc %s'%(vn.hour,vn.minute,biz_date()))
     ltok=ltoken()
     ngay,det=sync_gobox(ltok)
     st=det.get('status'); print('Ngày',ngay,st,det)
