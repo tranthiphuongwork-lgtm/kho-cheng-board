@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Chạy trên GitHub Actions 20:00 VN mỗi ngày: đồng bộ Gobox->Lark, dựng board, gửi cảnh báo Lark.
-import os,json,re,urllib.request,urllib.parse,urllib.error,datetime,math,time
+import os,json,re,urllib.request,urllib.parse,urllib.error,datetime,math,time,calendar
 from collections import defaultdict
 LARK_HOST='https://open.larksuite.com'; GB='https://api.gobox.asia'
 VNTZ=datetime.timezone(datetime.timedelta(hours=7))
@@ -43,6 +43,12 @@ def fv(v):
 def lpost(tok,path,body):
     r=urllib.request.Request(LARK_HOST+path,data=json.dumps(body).encode(),headers={'Authorization':'Bearer '+tok,'Content-Type':'application/json'},method='POST')
     return json.load(gopen(r,60))
+TAG_GOP='Tổng tháng (đã gộp)'   # dấu của dòng TỔNG THÁNG do condense_xk.py tạo
+def is_gop(f):
+    """True nếu là dòng TỔNG THÁNG (đã nén): mang số của CẢ THÁNG nhưng chỉ đứng ở 1 ngày
+    (ngày cuối tháng). Phải xử lý riêng ở mọi phép tính theo ngày, và không được xoá nhầm."""
+    return TAG_GOP in (gt(f.get('Ghi chú')) or '')
+
 def lsearch(tok,tid,fields):
     out=[];pt=None
     while True:
@@ -181,7 +187,9 @@ def sync_gobox(ltok):
         ck_recs.append({'Ngày':DATE_MS,'Loại nhập kho':'Nhập combo','Tên SP':opt,'Số lượng':int(gc),'Kho nhập':'Mê Linh 2'})
     # --- Dedup + ghi Xuất kho (xoá hết record ngày này) ---
     _SYNC_LOAI={'Xuất Bán hàng','Xuất Gia công'}  # chi xoa loai do sync tao; GIU manual (Xuat luu kho, Xuat Huy hang)
-    ex=[it['record_id'] for it in lsearch(ltok,T_XK,['Ngày đóng gói','Loại']) if it['fields'].get('Ngày đóng gói')==DATE_MS and gt(it['fields'].get('Loại')) in _SYNC_LOAI]
+    ex=[it['record_id'] for it in lsearch(ltok,T_XK,['Ngày đóng gói','Loại','Ghi chú'])
+        if it['fields'].get('Ngày đóng gói')==DATE_MS and gt(it['fields'].get('Loại')) in _SYNC_LOAI
+        and not is_gop(it['fields'])]   # KHONG xoa dong tong thang
     for i in range(0,len(ex),500): lpost(ltok,f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_XK}/records/batch_delete',{'records':ex[i:i+500]})
     for i in range(0,len(xk_recs),500): lpost(ltok,f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_XK}/records/batch_create',{'records':[{'fields':r} for r in xk_recs[i:i+500]]})
     # --- Dedup + ghi Chuyển kho (chỉ Nhập combo ngày này) ---
@@ -224,14 +232,25 @@ def compute(tok):
         f=it['fields'];g=gt(f.get('G SKU'))
         if not g: continue
         inv[str(g)]={'name':gt(f.get('Tên sản phẩm')),'cat':gt(f.get('Phân loại')) or '','hang':(gt(f.get('Hãng')) or '—').strip() or '—','qc':fv(f.get('Quy cách')),'ve':fv(f.get('Hàng dự kiến về')),'ac':fv(f.get('Tồn kho Âu Cơ')),'ml1':fv(f.get('Kho Mê Linh 1')),'ml2':fv(f.get('Kho Mê Linh 2'))}
-    xk=lsearch(tok,T_XK,['G SKU','Số lượng','Kho xuất','Ngày đóng gói'])
+    xk=lsearch(tok,T_XK,['G SKU','Số lượng','Kho xuất','Ngày đóng gói','Ghi chú'])
     salesw=defaultdict(lambda:defaultdict(float));days=set();now=datetime.datetime.now().timestamp()*1000;q7=defaultdict(float)
+    gop_mo=set()   # cac thang da bi nen (nam, thang)
     for it in xk:
         f=it['fields'];g=gt(f.get('G SKU'));q=f.get('Số lượng') or 0;k=f.get('Kho xuất');d=f.get('Ngày đóng gói')
-        if isinstance(d,(int,float)): days.add(d)
-        if g and k: salesw[g][k]+=q
-        if g and isinstance(d,(int,float)) and (now-d)<=7*86400*1000: q7[g]+=q
-    NDW=max(1,len(days));NDM=31
+        gop=is_gop(f)
+        if isinstance(d,(int,float)):
+            _dte=datetime.datetime.fromtimestamp(d/1000,tz=VNTZ).date()
+            if gop: gop_mo.add((_dte.year,_dte.month))
+            else: days.add(d)
+        if g and k: salesw[g][k]+=q            # dong gop van la so that -> van cong vao tong
+        if g and not gop and isinstance(d,(int,float)) and (now-d)<=7*86400*1000: q7[g]+=q
+    # Bo ngay chi tiet nam trong thang da nen (tranh dem 2 lan)
+    days={d for d in days
+          if (datetime.datetime.fromtimestamp(d/1000,tz=VNTZ).date().year,
+              datetime.datetime.fromtimestamp(d/1000,tz=VNTZ).date().month) not in gop_mo}
+    # MAU SO = so ngay THUC SU duoc du lieu bao phu. Moi thang da nen phai tinh du so ngay cua
+    # thang do; neu khong NDW tut xuong vai ngay va toc do ban bi thoi phong hang chuc lan.
+    NDW=max(1,len(days)+sum(calendar.monthrange(y,m)[1] for y,m in gop_mo));NDM=31
     def wk(g,k): return salesw.get(g,{}).get(k,0)
     def mo(g,k):
         m=may.get(g,{}); return m.get(k,0) if isinstance(m,dict) else 0
@@ -367,15 +386,18 @@ def send_day_reports(tok,ngay):
         if not g: continue
         inv[str(g)]={'name':gt(f.get('Tên sản phẩm')) or g,'hang':(gt(f.get('Hãng')) or '—').strip(),'pl':(gt(f.get('Phân loại')) or '').strip(),'ton':fv(f.get('Tồn kho Âu Cơ'))+fv(f.get('Kho Mê Linh 1'))+fv(f.get('Kho Mê Linh 2')),'tb':bool(f.get('Thông báo hết hàng'))}
     from collections import defaultdict as _dd
-    day=_dd(float);s14=_dd(float)
-    for it in lsearch(tok,T_XK,['G SKU','Số lượng','Ngày đóng gói']):
-        f=it['fields'];g=gt(f.get('G SKU'));q=f.get('Số lượng') or 0;dt=f.get('Ngày đóng gói')
+    day=_dd(float);s14=_dd(float);d14=set()
+    for it in lsearch(tok,T_XK,['G SKU','Số lượng','Ngày đóng gói','Ghi chú']):
+        f=it['fields']
+        if is_gop(f): continue   # dong tong thang khong phai so ban cua 1 ngay
+        g=gt(f.get('G SKU'));q=f.get('Số lượng') or 0;dt=f.get('Ngày đóng gói')
         if not g or not isinstance(dt,(int,float)): continue
         g=str(g)
         if dt==DATE_MS: day[g]+=q
         dd=(DATE_MS-dt)/86400000
-        if 0<=dd<14: s14[g]+=q
-    rate=lambda g:s14.get(g,0)/14
+        if 0<=dd<14: s14[g]+=q; d14.add(dt)
+    ND14=max(1,len(d14))   # chia cho so ngay THUC CO du lieu chi tiet, khong co dinh 14
+    rate=lambda g:s14.get(g,0)/ND14
     dleft=lambda g:(round(inv[g]['ton']/rate(g),1) if rate(g)>0 else None)
     chg=[{'name':inv[g]['name'],'qty':int(day[g]),'ton':int(inv[g]['ton']),'rate':round(rate(g),1),'days':dleft(g)} for g in sorted(day,key=lambda x:-day[x]) if inv.get(g,{}).get('hang')=='Cheng' and inv.get(g,{}).get('pl') in DYE_PL][:10]
     kal=[{'name':inv[g]['name'],'qty':int(day[g]),'ton':int(inv[g]['ton']),'rate':round(rate(g),1),'days':dleft(g)} for g in sorted(day,key=lambda x:-day[x]) if inv.get(g,{}).get('hang')=='Kalle'][:10]
