@@ -35,7 +35,7 @@ def build_rows(tok):
             'ac': M.fv(f.get('Tồn kho Âu Cơ')), 'ml1': M.fv(f.get('Kho Mê Linh 1')),
             'ml2': M.fv(f.get('Kho Mê Linh 2')),
         }
-    xk = M.lsearch(tok, M.T_XK, ['G SKU','Số lượng','Kho xuất','Ngày đóng gói','Ghi chú'])
+    xk = M.lsearch(tok, M.T_XK, ['G SKU','Số lượng','Kho xuất','Ngày đóng gói','Ghi chú','Loại'])
     salesw = defaultdict(lambda: defaultdict(float)); days = set(); gop_mo = set()
     for it in xk:
         f = it['fields']; g = M.gt(f.get('G SKU')); q = f.get('Số lượng') or 0; k = f.get('Kho xuất')
@@ -44,7 +44,8 @@ def build_rows(tok):
             _dte = datetime.datetime.fromtimestamp(d/1000, tz=VN).date()
             if M.is_gop(f): gop_mo.add((_dte.year, _dte.month))
             else: days.add(_dte)   # theo NGAY, vi co dong luu ca gio phut
-        if g and k: salesw[str(g)][k] += q     # dong gop van la so that -> van cong vao tong
+        # Chi tinh Xuat Ban hang; Xuat luu kho / Gia cong / Huy hang khong phai doanh so.
+        if g and k and M.is_ban(f): salesw[str(g)][k] += q
     days = {d for d in days if (d.year, d.month) not in gop_mo}
     # Moi thang da nen phai tinh du so ngay cua thang do, neu khong toc do ban bi thoi phong.
     NDW = max(1, len(days) + sum(calendar.monthrange(y,m)[1] for y,m in gop_mo)); NDM = 31
