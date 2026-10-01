@@ -43,11 +43,9 @@ def build_rows(tok):
         if isinstance(d, (int, float)):
             _dte = datetime.datetime.fromtimestamp(d/1000, tz=VN).date()
             if M.is_gop(f): gop_mo.add((_dte.year, _dte.month))
-            else: days.add(d)
+            else: days.add(_dte)   # theo NGAY, vi co dong luu ca gio phut
         if g and k: salesw[str(g)][k] += q     # dong gop van la so that -> van cong vao tong
-    days = {d for d in days
-            if (datetime.datetime.fromtimestamp(d/1000, tz=VN).date().year,
-                datetime.datetime.fromtimestamp(d/1000, tz=VN).date().month) not in gop_mo}
+    days = {d for d in days if (d.year, d.month) not in gop_mo}
     # Moi thang da nen phai tinh du so ngay cua thang do, neu khong toc do ban bi thoi phong.
     NDW = max(1, len(days) + sum(calendar.monthrange(y,m)[1] for y,m in gop_mo)); NDM = 31
     def rate(g, kho, shp_key):
