@@ -55,6 +55,13 @@ def lpost(tok,path,body):
         headers={'Authorization':'Bearer '+tok,'Content-Type':'application/json'},method='POST')
     return json.load(urllib.request.urlopen(r,timeout=60))
 TAG_GOP='Tổng tháng (đã gộp)'   # dấu của dòng TỔNG THÁNG do condense_xk.py tạo
+LOAI_BAN='Xuất Bán hàng'   # CHI loai nay moi la doanh so
+def is_ban(f):
+    """Chi 'Xuất Bán hàng' moi tinh vao toc do ban.
+    'Xuất lưu kho' (chuyen vao luu kho), 'Xuất Gia công', 'Xuất Hủy hàng',
+    'Xuất đóng Box' deu KHONG phai ban -> gop vao se thoi phong toc do ~32%."""
+    return gt(f.get('Loại'))==LOAI_BAN
+
 def is_gop(f):
     """True nếu là dòng TỔNG THÁNG (đã nén): mang số của CẢ THÁNG nhưng chỉ đứng ở 1 ngày
     (ngày cuối tháng). Phải xử lý riêng ở mọi phép tính theo ngày, và không được xoá nhầm."""
@@ -115,7 +122,7 @@ def load_backup_details(tok,lo_ms,hi_ms):
         tid=next((t['table_id'] for t in tabs if t['name']==nm),None)
         if not tid: continue
         try:
-            r=lsearch(tok,tid,['G SKU','Số lượng','Ngày đóng gói'])
+            r=lsearch(tok,tid,['G SKU','Số lượng','Ngày đóng gói','Loại'])
         except Exception as e:
             print('  doc %s loi: %s'%(nm,e)); continue
         rows+=r; have.add((y,m))
@@ -259,9 +266,10 @@ def main():
     per=_dd(float); s14=_dd(float); d14=set()
     # Thang da nen -> chi tiet nam trong bang XK_backup_YYYY-MM, doc lai de bao cao khong rong.
     bk_rows,bk_have=load_backup_details(tok,min(LO,NOW_MS-14*86400000),max(HI,NOW_MS))
-    for it in list(lsearch(tok,T_XK,['G SKU','Số lượng','Ngày đóng gói','Ghi chú']))+bk_rows:
+    for it in list(lsearch(tok,T_XK,['G SKU','Số lượng','Ngày đóng gói','Ghi chú','Loại']))+bk_rows:
         f=it['fields'];g=gt(f.get('G SKU'));q=f.get('Số lượng') or 0;dt=f.get('Ngày đóng gói')
         if not g or not isinstance(dt,(int,float)): continue
+        if not is_ban(f): continue   # chi tinh Xuat Ban hang
         g=str(g); gop=is_gop(f)
         # Da co chi tiet tu ban luu -> bo dong tong thang do, khong dem 2 lan.
         if gop and _ym(dt) in bk_have: continue
