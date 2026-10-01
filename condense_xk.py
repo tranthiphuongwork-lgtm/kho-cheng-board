@@ -19,6 +19,12 @@ APP=os.environ['LARK_APP_ID']; SEC=os.environ['LARK_APP_SECRET']; BASE=os.enviro
 T_XK='tblIHtLsM4QTMMQJ'
 TAG='Tổng tháng (đã gộp)'
 BK_PREFIX='XK_backup_'   # moi thang mot bang: XK_backup_YYYY-MM
+# Cot so luong THAT. 'Số lượng xuất' la cong thuc:
+#   IF(DVT = "Thùng", So luong * Quy cach, So luong)
+# Dong ghi theo THUNG ma lay cot 'So luong' se dem thieu hang chuc lan.
+F_QTY='Số lượng xuất'
+BK_FIELDS=[('G SKU',1),('Ngày đóng gói',5),(F_QTY,2),('Số lượng',2),
+           ('ĐVT',1),('Quy cách',2),('Kho xuất',1),('Loại',1),('Ghi chú',1)]
 VN=datetime.timezone(datetime.timedelta(hours=7))
 DRY_RUN=(os.getenv('DRY_RUN') or '').strip() in ('1','true','yes')
 
@@ -59,19 +65,25 @@ def list_tables(t):
         else: break
     return out
 
+def _ensure_fields(t, tid):
+    """Bo sung cac cot con thieu vao bang backup da ton tai."""
+    d=api(t,'GET',f'/open-apis/bitable/v1/apps/{BASE}/tables/{tid}/fields?page_size=100')
+    if d.get('_http'): return
+    have={x['field_name'] for x in (d.get('data') or {}).get('items',[])}
+    for n,ty in BK_FIELDS:
+        if n in have: continue
+        r=api(t,'POST',f'/open-apis/bitable/v1/apps/{BASE}/tables/{tid}/fields',
+              {'field_name':n,'type':ty})
+        print('  + them cot "%s" vao bang backup: %s'%(n, 'OK' if r.get('code')==0 else r))
+
 def ensure_backup_table(t, name):
     """Tra ve (table_id, vua_tao_moi). Neu bang da co thi dung lai bang do."""
     for it in list_tables(t):
-        if it['name']==name: return it['table_id'], False
+        if it['name']==name:
+            _ensure_fields(t,it['table_id'])      # bang cu co the thieu cot -> them vao
+            return it['table_id'], False
     # Cot dau tien la cot chinh -> phai la kieu van ban.
-    body={'table':{'name':name,'fields':[
-        {'field_name':'G SKU','type':1},
-        {'field_name':'Ngày đóng gói','type':5},
-        {'field_name':'Số lượng','type':2},
-        {'field_name':'Kho xuất','type':1},
-        {'field_name':'Loại','type':1},
-        {'field_name':'Ghi chú','type':1},
-    ]}}
+    body={'table':{'name':name,'fields':[{'field_name':n,'type':t} for n,t in BK_FIELDS]}}
     d=api(t,'POST',f'/open-apis/bitable/v1/apps/{BASE}/tables',body)
     if d.get('_http') or d.get('code')!=0: raise SystemExit('Tạo bảng backup lỗi: %s'%d)
     return d['data']['table_id'], True
@@ -88,7 +100,7 @@ def write_backup(t, tid, rows):
 
 def search_all(t):
     out=[]; pt=None
-    fields=['Ngày đóng gói','G SKU','Số lượng','Kho xuất','Loại','Ghi chú']
+    fields=['Ngày đóng gói','G SKU','Số lượng',F_QTY,'ĐVT','Quy cách','Kho xuất','Loại','Ghi chú']
     while True:
         url=f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_XK}/records/search?page_size=500'+(('&page_token='+pt) if pt else '')
         d=api(t,'POST',url,{'field_names':fields})
@@ -123,11 +135,14 @@ def main():
         if not isinstance(d,(int,float)) or not (lo<=d<=hi): continue
         gc=gt(f.get('Ghi chú')); g=gt(f.get('G SKU')); kho=gt(f.get('Kho xuất')); loai=gt(f.get('Loại'))
         if TAG in gc:
-            existing[(kho,loai,g)]=(it['record_id'], num(f.get('Số lượng')))
+            existing[(kho,loai,g)]=(it['record_id'], num(f.get(F_QTY)))
         else:
-            sl=num(f.get('Số lượng'))
+            sl=num(f.get(F_QTY))          # SO LUONG THAT (da nhan quy cach neu la Thung)
+            goc=num(f.get('Số lượng'))    # so nhap tay, giu lai de doi chieu
             aging[(kho,loai,g)]+=sl; del_ids.append(it['record_id'])
-            bk_rows.append({'G SKU':str(g),'Ngày đóng gói':int(d),'Số lượng':int(sl),
+            bk_rows.append({'G SKU':str(g),'Ngày đóng gói':int(d),
+                            F_QTY:int(sl),'Số lượng':int(goc),
+                            'ĐVT':gt(f.get('ĐVT')),'Quy cách':num(f.get('Quy cách')),
                             'Kho xuất':kho,'Loại':loai,'Ghi chú':gc})
     print('  Chi tiết cần gộp: %d dòng -> %d nhóm (dòng tổng đã có: %d)'%(len(del_ids),len(aging),len(existing)))
     if not del_ids:
@@ -149,6 +164,7 @@ def main():
     for (kho,loai,g),sl in aging.items():
         if (kho,loai,g) in existing:
             rid,cur=existing[(kho,loai,g)]
+            # Dong tong khong co DVT nen 'Số lượng xuất' = 'Số lượng'.
             upd.append({'record_id':rid,'fields':{'Số lượng':int(cur+sl)}})
         else:
             f={'Ngày đóng gói':eom,'G SKU':str(g),'Số lượng':int(sl),'Ghi chú':TAG}
