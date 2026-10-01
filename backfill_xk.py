@@ -82,8 +82,9 @@ for sku, name, dau, gc, used, left in s2:
 
 # --- Xoá bản ghi cũ của ĐÚNG ngày đó rồi ghi lại ---
 _SYNC_LOAI = {'Xuất Bán hàng', 'Xuất Gia công'}
-ex = [it['record_id'] for it in M.lsearch(ltok, M.T_XK, ['Ngày đóng gói', 'Loại'])
-      if it['fields'].get('Ngày đóng gói') == DATE_MS and M.gt(it['fields'].get('Loại')) in _SYNC_LOAI]
+ex = [it['record_id'] for it in M.lsearch(ltok, M.T_XK, ['Ngày đóng gói', 'Loại', 'Ghi chú'])
+      if it['fields'].get('Ngày đóng gói') == DATE_MS and M.gt(it['fields'].get('Loại')) in _SYNC_LOAI
+      and not M.is_gop(it['fields'])]   # KHONG xoa dong tong thang: chay bu ngay cuoi thang se mat ca thang
 for i in range(0, len(ex), 500):
     M.lpost(ltok, f'/open-apis/bitable/v1/apps/{M.BASE}/tables/{M.T_XK}/records/batch_delete',
             {'records': ex[i:i+500]})
