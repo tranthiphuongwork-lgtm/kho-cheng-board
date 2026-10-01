@@ -134,32 +134,29 @@ def _ym(ms):
     return (d.year,d.month)
 
 def load_incoming(tok):
-    """Hàng chuẩn bị về = cột 'SL chưa về' của bảng Đặt hàng (số còn lại của đơn).
-    Tách 2 loại vì ý nghĩa rất khác nhau:
-      qty  = đơn ĐÃ ĐẶT NCC   -> hàng thật sự đang trên đường về
-      pend = đơn CHƯA ĐẶT     -> mới lên đơn trong bảng, NCC chưa nhận, hàng CHƯA về
-    """
+    """Hàng sắp về = các đơn trong bảng Đặt hàng còn 'SL chưa về' > 0.
+    Quy tắc của kho: đơn đã được lên trong bảng thì đều là đã đặt hàng,
+    nên KHÔNG phân biệt theo 'Tình trạng đặt hàng'. Mỗi sản phẩm trả về
+    tổng số lượng chưa về và danh sách mã đơn hàng tương ứng."""
     from collections import defaultdict
-    m=defaultdict(lambda:{'qty':0.0,'pend':0.0,'date':None})
-    for it in lsearch(tok,T_DH,['Tên sản phẩm','SL chưa về','Tình trạng đặt hàng','Ngày nhận hàng dự kiến']):
+    m=defaultdict(lambda:{'qty':0.0,'dh':defaultdict(float)})
+    for it in lsearch(tok,T_DH,['Tên sản phẩm','SL chưa về','Đơn đặt hàng']):
         f=it['fields']; nm=gt(f.get('Tên sản phẩm'))
         if not nm: continue
         left=_num(f.get('SL chưa về'))
         if left<=0: continue
-        k=_norm(nm); st=(gt(f.get('Tình trạng đặt hàng')) or '').strip().lower()
-        if 'đã đặt' in st:
-            m[k]['qty']+=left
-            d=f.get('Ngày nhận hàng dự kiến')
-            if isinstance(d,(int,float)) and (m[k]['date'] is None or d<m[k]['date']): m[k]['date']=d
-        else:
-            m[k]['pend']+=left
+        k=_norm(nm)
+        m[k]['qty']+=left
+        # Gom theo tung ma don. Dong khong co ma van phai tinh vao, neu khong
+        # tong cac phan se khong bang tong chung.
+        dh=(gt(f.get('Đơn đặt hàng')) or '').strip() or '(không mã ĐH)'
+        m[k]['dh'][dh]+=left
     return m
 def ve_of(inc,name):
     ik=inc.get(_norm(name))
-    if not ik or (not ik['qty'] and not ik['pend']): return None
-    d=ik['date']
-    ds=(datetime.datetime.fromtimestamp(d/1000,tz=datetime.timezone(datetime.timedelta(hours=7))).strftime('%d/%m') if d else None)
-    return {'qty':int(ik['qty']),'pend':int(ik['pend']),'date':ds}
+    if not ik or not ik['qty']: return None
+    dh=sorted(((d,int(q)) for d,q in ik['dh'].items() if q>0), key=lambda x:-x[1])
+    return {'qty':int(ik['qty']),'dh':[[d,q] for d,q in dh]}
 
 TPL=r'''<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Báo cáo bán hàng __KIND__ __RANGE__</title>
@@ -213,11 +210,11 @@ var rk=document.getElementById('risk');
 if(!D.risk.length){rk.innerHTML='<div class=empty>Không có mã nào dưới 1 tháng 🎉</div>'}else{
  rk.innerHTML=D.risk.map(function(x){var c=x.days<7?'cr':(x.days<14?'wn':'ye');
   var ve=(function(){var v=x.ve;
-    if(!v) return '<div style="font-size:11px;color:#f87171;margin-top:2px">📦 Chưa có đơn đặt nào</div>';
-    var s='';
-    if(v.qty) s+='<div style="font-size:11px;color:#34d399;margin-top:2px">📦 Đã đặt, chờ về <b>+'+fmt(v.qty)+'</b>'+(v.date?(' · dự kiến '+v.date):'')+'</div>';
-    if(v.pend) s+='<div style="font-size:11px;color:#fbbf24;margin-top:2px">📝 Đã lên đơn nhưng CHƯA đặt NCC: <b>'+fmt(v.pend)+'</b></div>';
-    return s||'<div style="font-size:11px;color:#f87171;margin-top:2px">📦 Chưa có hàng về</div>';})();
+    if(!v) return '<div style="font-size:11px;color:#f87171;margin-top:2px">📦 Chưa có đơn nào đang chờ về</div>';
+    var dh='';
+    if(v.dh&&v.dh.length){ dh=' · ĐH: '+v.dh.map(function(d){return d[0]+' <b>'+fmt(d[1])+'</b>';}).join(' · '); }
+    return '<div style="font-size:11px;color:#34d399;margin-top:2px">📦 Chờ về <b>+'+fmt(v.qty)+'</b>'
+           +'<span style="opacity:.75">'+dh+'</span></div>';})();
   return '<div class="ri '+c+'"><div class=nm>'+x.name+ve+'</div><div class=meta>bán ~<b>'+fmt(x.rate)+'</b>/ngày · tồn <b>'+fmt(x.ton)+'</b></div><div class="dd '+c+'">'+x.days+'<div style="font-size:9px;font-weight:600;color:#9fb0d0">ngày</div></div></div>'}).join('')}
 </script></body></html>'''
 
