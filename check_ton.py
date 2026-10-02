@@ -9,7 +9,7 @@ GOBOX_CLIENT_ID, GOBOX_CLIENT_SECRET.
 ENV tuỳ chọn: DRY_RUN=1 (chỉ in, không gửi), MIN_LECH=<số> (bỏ qua lệch nhỏ hơn),
 LARK_CONFIRM_CHAT=<chat_id nhóm nhận>.
 """
-import os, json, re, time, urllib.request, urllib.parse, urllib.error, datetime
+import os, io, json, re, time, urllib.request, urllib.parse, urllib.error, datetime
 
 LARK_HOST = 'https://open.larksuite.com'
 GB = os.getenv('GOBOX_BASE', 'https://api.gobox.asia').rstrip('/')
@@ -154,42 +154,177 @@ sosanh = len(units)
 print('Đối chiếu được %d mã | lệch cả 2 kho: %d | lệch 1 kho: %d'
       % (sosanh, len(ca_hai), len(mot_kho)))
 
-def dong(r):
-    sku, L, G, d32, d65 = r
-    p = []
-    if abs(d32) >= MIN_LECH: p.append('Âu Cơ GB %d / Lark %d (**%+d**)' % (G[32], L[32], d32))
-    if abs(d65) >= MIN_LECH: p.append('Mê Linh GB %d / Lark %d (**%+d**)' % (G[65], L[65], d65))
-    return '**%s** · %s\n   %s' % (L['ten'][:40], sku, ' · '.join(p))
 
-now = datetime.datetime.now(VN).strftime('%d/%m %H:%M')
-if not ca_hai and not mot_kho:
-    body = '✅ Không có mã nào lệch tồn (đối chiếu %d mã).' % sosanh
+# ---------------- Trang HTML ----------------
+now = datetime.datetime.now(VN)
+
+def hang(r, nhom):
+    ma, L, G, d32, d65 = r
+    return {'ma': ma, 'ten': L['ten'], 'nhom': nhom,
+            'acg': int(G[32]), 'acl': int(L[32]), 'acd': int(d32),
+            'mlg': int(G[65]), 'mll': int(L[65]), 'mld': int(d65)}
+
+rows = [hang(r, 2) for r in ca_hai] + [hang(r, 1) for r in mot_kho]
+rows.sort(key=lambda x: -(abs(x['acd']) + abs(x['mld'])))
+thieu = sorted(s for s in lark if s not in gobox and s not in trong_nhom)
+am = [r for r in rows if r['acl'] < 0 or r['mll'] < 0]
+meta = {'ngay': now.strftime('%d/%m/%Y %H:%M'), 'sosanh': sosanh, 'ca_hai': len(ca_hai),
+        'mot_kho': len(mot_kho), 'nguong': MIN_LECH, 'am': len(am),
+        'thieu': thieu, 'rows': rows}
+
+TPL = """<!doctype html><html lang="vi"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Đối chiếu tồn kho Gobox ↔ Lark</title><style>
+:root{--bg:#f6f7fb;--card:#fff;--ink:#16181d;--mut:#6b7280;--line:#e5e7eb;
+      --up:#c2410c;--down:#1d4ed8;--bad:#dc2626}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+     font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:0 16px 48px}
+header{background:linear-gradient(135deg,#0f766e,#0891b2);color:#fff;padding:26px 0 30px;margin-bottom:-18px}
+header .wrap{padding-bottom:0}
+h1{margin:0;font-size:21px;font-weight:650}
+.sub{opacity:.85;font-size:13px;margin-top:4px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:0 0 18px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;
+      box-shadow:0 1px 3px rgba(16,24,40,.06)}
+.tile b{display:block;font-size:26px;font-weight:680;line-height:1.1}
+.tile span{color:var(--mut);font-size:12px}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+input,select{font:inherit;padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:#fff}
+input{flex:1;min-width:220px}
+.cnt{color:var(--mut);font-size:13px;flex:0 0 auto}
+.box{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow-x:auto;
+     box-shadow:0 1px 3px rgba(16,24,40,.06)}
+table{width:100%;min-width:1000px;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th{position:sticky;top:0;background:#f9fafb;font-size:12px;color:var(--mut);font-weight:600;
+   text-transform:uppercase;letter-spacing:.3px;z-index:1}
+th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3){text-align:left;white-space:normal}
+th:nth-child(2),td:nth-child(2){min-width:260px}
+td:nth-child(1){color:var(--mut);font-size:12px}
+tbody tr:hover{background:#f9fafb}
+.ma{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--mut)}
+.up{color:var(--up);font-weight:650}.down{color:var(--down);font-weight:650}
+.neg{color:var(--bad);font-weight:650}
+.tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;
+     background:#fef3c7;color:#92400e;margin-left:6px}
+.tag.one{background:#e0e7ff;color:#3730a3}
+.note{color:var(--mut);font-size:12.5px;margin:14px 0 0;line-height:1.7}
+.sep{border-top:1px solid var(--line);margin:22px 0 14px;padding-top:14px}
+h2{font-size:14px;margin:0 0 8px;color:var(--mut);text-transform:uppercase;letter-spacing:.3px}
+</style></head><body>
+<header><div class="wrap"><h1>📦 Đối chiếu tồn kho Gobox ↔ Lark</h1>
+<div class="sub" id="sub"></div></div></header>
+<div class="wrap">
+<div class="tiles" id="tiles"></div>
+<div class="bar">
+  <input id="q" placeholder="Tìm theo mã hoặc tên sản phẩm…">
+  <span id="cnt" class="cnt"></span>
+  <select id="f">
+    <option value="all">Tất cả mã lệch</option>
+    <option value="2">Lệch ở cả 2 kho</option>
+    <option value="1">Chỉ lệch 1 kho</option>
+    <option value="ac">Lệch kho Âu Cơ</option>
+    <option value="ml">Lệch kho Mê Linh</option>
+    <option value="neg">Chỉ mã tồn Lark âm</option>
+  </select>
+</div>
+<div class="box"><table>
+<thead><tr><th>#</th><th>Sản phẩm</th><th>Mã</th>
+<th>Âu Cơ · Gobox</th><th>Âu Cơ · Lark</th><th>Lệch</th>
+<th>Mê Linh · Gobox</th><th>Mê Linh · Lark</th><th>Lệch</th></tr></thead>
+<tbody id="tb"></tbody></table></div>
+<div id="extra"></div>
+<p class="note" id="foot"></p>
+</div>
+<script>
+const D = __DATA__;
+const n = v => v.toLocaleString('vi-VN');
+const sg = v => (v > 0 ? '+' : '') + n(v);
+document.getElementById('sub').textContent =
+  'Cập nhật ' + D.ngay + ' · bỏ qua chênh lệch nhỏ hơn ' + D.nguong;
+document.getElementById('tiles').innerHTML = [
+  ['Mã đối chiếu', D.sosanh, ''],
+  ['Lệch ở cả 2 kho', D.ca_hai, 'up'],
+  ['Chỉ lệch 1 kho', D.mot_kho, ''],
+  ['Mã tồn Lark âm', D.am, 'neg']
+].map(t => '<div class="tile"><b class="' + t[2] + '">' + n(t[1]) +
+     '</b><span>' + t[0] + '</span></div>').join('');
+
+const cell = (v, isDiff) => {
+  let c = '';
+  if (isDiff) c = v > 0 ? 'up' : (v < 0 ? 'down' : '');
+  else if (v < 0) c = 'neg';
+  return '<td class="' + c + '">' + (isDiff ? sg(v) : n(v)) + '</td>';
+};
+function draw() {
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const f = document.getElementById('f').value;
+  let r = D.rows;
+  if (f === '2') r = r.filter(x => x.nhom === 2);
+  else if (f === '1') r = r.filter(x => x.nhom === 1);
+  else if (f === 'neg') r = r.filter(x => x.acl < 0 || x.mll < 0);
+  else if (f === 'ac') r = r.filter(x => Math.abs(x.acd) >= D.nguong);
+  else if (f === 'ml') r = r.filter(x => Math.abs(x.mld) >= D.nguong);
+  if (q) r = r.filter(x => (x.ten + ' ' + x.ma).toLowerCase().includes(q));
+  // Loc theo 1 kho thi xep theo muc lech cua chinh kho do.
+  if (f === 'ac') r = r.slice().sort((a, b) => Math.abs(b.acd) - Math.abs(a.acd));
+  else if (f === 'ml') r = r.slice().sort((a, b) => Math.abs(b.mld) - Math.abs(a.mld));
+  document.getElementById('cnt').textContent = r.length + ' mã';
+  document.getElementById('tb').innerHTML = r.map((x, i) =>
+    '<tr><td>' + (i + 1) + '</td><td>' + x.ten +
+    (x.nhom === 2 ? '<span class="tag">cả 2 kho</span>'
+                  : '<span class="tag one">1 kho</span>') +
+    '</td><td class="ma">' + x.ma + '</td>' +
+    cell(x.acg) + cell(x.acl) + cell(x.acd, 1) +
+    cell(x.mlg) + cell(x.mll) + cell(x.mld, 1) + '</tr>').join('')
+    || '<tr><td colspan="9" style="text-align:center;color:#6b7280;padding:28px">Không có mã nào khớp bộ lọc.</td></tr>';
+}
+document.getElementById('q').addEventListener('input', draw);
+document.getElementById('f').addEventListener('change', draw);
+draw();
+if (D.thieu.length) document.getElementById('extra').innerHTML =
+  '<div class="sep"><h2>' + D.thieu.length +
+  ' mã trong Tổng sản phẩm nhưng Gobox không có tồn</h2><div class="box" style="padding:12px 14px">' +
+  '<span class="ma">' + D.thieu.join(', ') + '</span></div></div>';
+document.getElementById('foot').innerHTML =
+  'Đối chiếu: Gobox kho 32 <b>Online Cheng</b> ↔ cột <b>Tồn kho Âu Cơ</b> · ' +
+  'Gobox kho 65 <b>Kho Mê Linh</b> ↔ <b>Kho Mê Linh 1 + Kho Mê Linh 2</b>. ' +
+  'Kho 47 (Cửa hàng) và kho 7 (Gobox Hà Nội) không tính.<br>' +
+  'Lệch = Gobox − Lark: <span class="up">số dương</span> là Gobox nhiều hơn, ' +
+  '<span class="down">số âm</span> là Lark nhiều hơn. ' +
+  'Các nhóm hàng ngẫu nhiên được cộng gộp, chỉ so tổng của nhóm.';
+</script></body></html>"""
+
+out = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ton_lech.html')
+io.open(out, 'w', encoding='utf-8').write(TPL.replace('__DATA__', json.dumps(meta, ensure_ascii=False)))
+print('Da ghi', out)
+
+# ---------------- Thẻ Lark (ngắn, chỉ dẫn link) ----------------
+URL = ('https://tranthiphuongwork-lgtm.github.io/kho-cheng-board/ton_lech.html?v='
+       + str(int(now.timestamp())))
+if not rows:
+    body = '✅ Không có mã nào lệch tồn — đối chiếu **%d mã** (ngưỡng %g).' % (sosanh, MIN_LECH)
 else:
+    top = rows[0]
     body = ('Đối chiếu **%d mã** lúc %s.\n'
-            '**Lệch ở CẢ 2 kho: %d mã** · lệch 1 kho: %d mã\n\n'
-            % (sosanh, now, len(ca_hai), len(mot_kho)))
-    if ca_hai:
-        body += '**── Lệch cả 2 kho ──**\n' + '\n'.join(dong(r) for r in ca_hai[:15]) + '\n'
-        if len(ca_hai) > 15: body += '_… và %d mã nữa_\n' % (len(ca_hai) - 15)
-    if mot_kho:
-        body += '\n**── Chỉ lệch 1 kho ──**\n' + '\n'.join(dong(r) for r in mot_kho[:10])
-        if len(mot_kho) > 10: body += '\n_… và %d mã nữa_' % (len(mot_kho) - 10)
-
-thieu = [s for s in lark if s not in gobox and s not in trong_nhom]
-foot = ('\n\n_Bỏ qua chênh lệch < %g. Đối chiếu: Gobox kho 32 Online Cheng ↔ Tồn kho Âu Cơ, '
-        'Gobox kho 65 Kho Mê Linh ↔ Kho Mê Linh 1 + 2._' % MIN_LECH)
-if thieu:
-    foot += '\n_%d mã trong Tổng sản phẩm không có trên Gobox (vd: %s)._' % (
-        len(thieu), ', '.join(sorted(thieu)[:5]))
-body += foot
-
+            'Lệch ở **cả 2 kho: %d mã** · chỉ 1 kho: **%d mã** · tồn Lark âm: **%d mã**.\n'
+            'Nặng nhất: **%s** (Âu Cơ %+d · Mê Linh %+d).'
+            % (sosanh, now.strftime('%d/%m %H:%M'), len(ca_hai), len(mot_kho), len(am),
+               top['ten'][:38], top['acd'], top['mld']))
 card = {'config': {'wide_screen_mode': True},
         'header': {'title': {'tag': 'plain_text', 'content': '📦 Đối chiếu tồn kho Gobox ↔ Lark'},
-                   'template': 'orange' if (ca_hai or mot_kho) else 'green'},
+                   'template': 'orange' if rows else 'green'},
         'elements': [{'tag': 'div', 'text': {'tag': 'lark_md', 'content': body}}]}
+if rows:
+    card['elements'].append({'tag': 'action', 'actions': [
+        {'tag': 'button', 'text': {'tag': 'plain_text', 'content': 'Xem danh sách lệch tồn'},
+         'type': 'primary', 'url': URL}]})
 
 print('\n----- NỘI DUNG THẺ -----')
-print(body[:2000])
+print(body)
+print('Link:', URL)
 if DRY:
     print('\n(DRY_RUN: không gửi Lark.)')
     raise SystemExit
