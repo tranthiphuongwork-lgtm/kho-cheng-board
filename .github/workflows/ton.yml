@@ -1,0 +1,30 @@
+name: Doi chieu ton kho Gobox - Lark (hang ngay)
+on:
+  schedule:
+    - cron: '0 23 * * *'   # 23:00 UTC = 06:00 sang gio VN (Actions thuong tre 3-8h)
+  workflow_dispatch:
+    inputs:
+      min_lech:
+        description: 'Bo qua chenh lech nho hon so nay'
+        default: '1'
+      dry_run:
+        description: 'De 1 neu chi muon xem log, khong gui Lark'
+        default: ''
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Doi chieu ton kho
+        env:
+          LARK_APP_ID: ${{ secrets.LARK_APP_ID }}
+          LARK_APP_SECRET: ${{ secrets.LARK_APP_SECRET }}
+          LARK_APP_TOKEN: ${{ secrets.LARK_APP_TOKEN }}
+          GOBOX_CLIENT_ID: ${{ secrets.GOBOX_CLIENT_ID }}
+          GOBOX_CLIENT_SECRET: ${{ secrets.GOBOX_CLIENT_SECRET }}
+          MIN_LECH: ${{ github.event.inputs.min_lech || '1' }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: python check_ton.py
