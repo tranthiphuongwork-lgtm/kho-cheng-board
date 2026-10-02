@@ -6,7 +6,7 @@ on:
     inputs:
       min_lech:
         description: 'Bo qua chenh lech nho hon so nay'
-        default: '1'
+        default: '50'
       dry_run:
         description: 'De 1 neu chi muon xem log, khong gui Lark'
         default: ''
@@ -25,6 +25,6 @@ jobs:
           LARK_APP_TOKEN: ${{ secrets.LARK_APP_TOKEN }}
           GOBOX_CLIENT_ID: ${{ secrets.GOBOX_CLIENT_ID }}
           GOBOX_CLIENT_SECRET: ${{ secrets.GOBOX_CLIENT_SECRET }}
-          MIN_LECH: ${{ github.event.inputs.min_lech || '1' }}
+          MIN_LECH: ${{ github.event.inputs.min_lech || '50' }}
           DRY_RUN: ${{ github.event.inputs.dry_run }}
         run: python check_ton.py
