@@ -180,7 +180,7 @@ TPL = """<!doctype html><html lang="vi"><head><meta charset="utf-8">
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);
      font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
-.wrap{max-width:1180px;margin:0 auto;padding:0 16px 48px}
+.wrap{max-width:1320px;margin:0 auto;padding:0 16px 48px}
 header{background:linear-gradient(135deg,#0f766e,#0891b2);color:#fff;padding:26px 0 30px;margin-bottom:-18px}
 header .wrap{padding-bottom:0}
 h1{margin:0;font-size:21px;font-weight:650}
@@ -198,10 +198,19 @@ input{flex:1;min-width:220px}
      box-shadow:0 1px 3px rgba(16,24,40,.06)}
 table{width:100%;min-width:1000px;border-collapse:collapse;font-variant-numeric:tabular-nums}
 th,td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
-th{position:sticky;top:0;background:#f9fafb;font-size:12px;color:var(--mut);font-weight:600;
+th{position:sticky;background:#f9fafb;font-size:12px;color:var(--mut);font-weight:600;
    text-transform:uppercase;letter-spacing:.3px;z-index:1}
-th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3){text-align:left;white-space:normal}
-th:nth-child(2),td:nth-child(2){min-width:260px}
+.h1 th{top:0}
+.h2 th{top:31px;font-size:11px}
+.grp{text-align:center;color:var(--ink);font-size:12px;border-left:1px solid var(--line)}
+.grp.ml{border-left:2px solid #cbd5e1}
+td.ml:first-of-type{border-left:2px solid #f1f5f9}
+th.c1,td.c1{text-align:left;white-space:normal}
+th.c1.ten,td.c1.ten{min-width:250px}
+/* Loc 1 kho -> an han 3 cot cua kho con lai cho de doc. */
+table.an-ml .ml{display:none}
+table.an-ac .ac{display:none}
+table.an-ml,table.an-ac{min-width:700px}
 td:nth-child(1){color:var(--mut);font-size:12px}
 tbody tr:hover{background:#f9fafb}
 .ma{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--mut)}
@@ -231,9 +240,11 @@ h2{font-size:14px;margin:0 0 8px;color:var(--mut);text-transform:uppercase;lette
   </select>
 </div>
 <div class="box"><table>
-<thead><tr><th>#</th><th>Sản phẩm</th><th>Mã</th>
-<th>Âu Cơ · Gobox</th><th>Âu Cơ · Lark</th><th>Lệch</th>
-<th>Mê Linh · Gobox</th><th>Mê Linh · Lark</th><th>Lệch</th></tr></thead>
+<thead>
+<tr class="h1"><th rowspan="2">#</th><th rowspan="2" class="c1 ten">Sản phẩm</th><th rowspan="2" class="c1">Mã</th>
+<th colspan="3" class="grp ac">Kho Âu Cơ</th><th colspan="3" class="grp ml">Kho Mê Linh</th></tr>
+<tr class="h2"><th class="ac">Gobox</th><th class="ac">Lark</th><th class="ac">Lệch</th>
+<th class="ml">Gobox</th><th class="ml">Lark</th><th class="ml">Lệch</th></tr></thead>
 <tbody id="tb"></tbody></table></div>
 <div id="extra"></div>
 <p class="note" id="foot"></p>
@@ -252,10 +263,10 @@ document.getElementById('tiles').innerHTML = [
 ].map(t => '<div class="tile"><b class="' + t[2] + '">' + n(t[1]) +
      '</b><span>' + t[0] + '</span></div>').join('');
 
-const cell = (v, isDiff) => {
-  let c = '';
-  if (isDiff) c = v > 0 ? 'up' : (v < 0 ? 'down' : '');
-  else if (v < 0) c = 'neg';
+const cell = (v, isDiff, kho) => {
+  let c = kho;
+  if (isDiff) c += v > 0 ? ' up' : (v < 0 ? ' down' : '');
+  else if (v < 0) c += ' neg';
   return '<td class="' + c + '">' + (isDiff ? sg(v) : n(v)) + '</td>';
 };
 function draw() {
@@ -272,13 +283,17 @@ function draw() {
   if (f === 'ac') r = r.slice().sort((a, b) => Math.abs(b.acd) - Math.abs(a.acd));
   else if (f === 'ml') r = r.slice().sort((a, b) => Math.abs(b.mld) - Math.abs(a.mld));
   document.getElementById('cnt').textContent = r.length + ' mã';
+  // Chon 1 kho -> an 3 cot cua kho con lai.
+  const tb = document.querySelector('table');
+  tb.classList.toggle('an-ml', f === 'ac');
+  tb.classList.toggle('an-ac', f === 'ml');
   document.getElementById('tb').innerHTML = r.map((x, i) =>
-    '<tr><td>' + (i + 1) + '</td><td>' + x.ten +
+    '<tr><td>' + (i + 1) + '</td><td class="c1 ten">' + x.ten +
     (x.nhom === 2 ? '<span class="tag">cả 2 kho</span>'
                   : '<span class="tag one">1 kho</span>') +
-    '</td><td class="ma">' + x.ma + '</td>' +
-    cell(x.acg) + cell(x.acl) + cell(x.acd, 1) +
-    cell(x.mlg) + cell(x.mll) + cell(x.mld, 1) + '</tr>').join('')
+    '</td><td class="c1 ma">' + x.ma + '</td>' +
+    cell(x.acg, 0, 'ac') + cell(x.acl, 0, 'ac') + cell(x.acd, 1, 'ac') +
+    cell(x.mlg, 0, 'ml') + cell(x.mll, 0, 'ml') + cell(x.mld, 1, 'ml') + '</tr>').join('')
     || '<tr><td colspan="9" style="text-align:center;color:#6b7280;padding:28px">Không có mã nào khớp bộ lọc.</td></tr>';
 }
 document.getElementById('q').addEventListener('input', draw);
