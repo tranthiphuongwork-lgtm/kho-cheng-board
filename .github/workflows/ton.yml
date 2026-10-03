@@ -10,6 +10,8 @@ on:
       dry_run:
         description: 'De 1 neu chi muon xem log, khong gui Lark'
         default: ''
+permissions:
+  contents: write
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -28,3 +30,10 @@ jobs:
           MIN_LECH: ${{ github.event.inputs.min_lech || '50' }}
           DRY_RUN: ${{ github.event.inputs.dry_run }}
         run: python check_ton.py
+      - name: Dua trang len GitHub Pages
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add ton_lech.html
+          git commit -m "Cap nhat doi chieu ton kho" || echo "khong co thay doi"
+          git push
