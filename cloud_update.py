@@ -56,15 +56,51 @@ def is_gop(f):
     (ngày cuối tháng). Phải xử lý riêng ở mọi phép tính theo ngày, và không được xoá nhầm."""
     return TAG_GOP in (gt(f.get('Ghi chú')) or '')
 
-def lsearch(tok,tid,fields):
+def lsearch(tok,tid,fields,meta=False):
+    # meta=True -> kem created_by, de biet dong nao do BOT tao, dong nao nguoi nhap tay.
     out=[];pt=None
     while True:
         url=LARK_HOST+f'/open-apis/bitable/v1/apps/{BASE}/tables/{tid}/records/search?page_size=500'+(('&page_token='+pt) if pt else '')
-        d=lpost(tok,url.replace(LARK_HOST,''),{'page_size':500,'field_names':fields})
+        body={'page_size':500,'field_names':fields}
+        if meta: body['automatic_fields']=True
+        d=lpost(tok,url.replace(LARK_HOST,''),body)
         out+=d['data'].get('items',[])
         if d['data'].get('has_more'): pt=d['data']['page_token']
         else: break
     return out
+# Tai khoan ung dung dong bo (hien thi la 'KT'). Chi nhung dong DO NO tao moi bi xoa
+# va ghi lai; dong do nguoi nhap tay thang vao Lark thi giu nguyen, khong dung toi.
+SYNC_UID=(os.getenv('SYNC_CREATOR_ID') or 'ou_636687851bacc9e1e63f8cf89c8cddb5').strip()
+def is_auto(it):
+    return ((it.get('created_by') or {}).get('id') or '')==SYNC_UID
+
+def sync_giacong(ltok,DATE_MS,gc_recs):
+    """Dong bo dong "Xuat Gia cong" cua 1 ngay MA KHONG XOA DONG NAO.
+    Doi chieu theo G SKU: thieu -> them, lech so luong -> sua, thua -> de nguyen.
+    Dong nguoi nhap tay khong bi dung toi, va cung khong bi ghi de."""
+    cu=[it for it in lsearch(ltok,T_XK,['Ngày đóng gói','Loại','G SKU','Số lượng','Ghi chú'],meta=True)
+        if it['fields'].get('Ngày đóng gói')==DATE_MS
+        and gt(it['fields'].get('Loại'))=='Xuất Gia công' and not is_gop(it['fields'])]
+    bot={}
+    for it in cu:
+        if is_auto(it): bot[gt(it['fields'].get('G SKU'))]=it
+    tay=[it for it in cu if not is_auto(it)]
+    them=[];sua=[]
+    for r in gc_recs:
+        old=bot.get(str(r['G SKU']))
+        if old is None: them.append(r)
+        elif int(old['fields'].get('Số lượng') or 0)!=int(r['Số lượng']):
+            sua.append({'record_id':old['record_id'],'fields':{'Số lượng':int(r['Số lượng'])}})
+    for i in range(0,len(them),500):
+        lpost(ltok,f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_XK}/records/batch_create',
+              {'records':[{'fields':x} for x in them[i:i+500]]})
+    for i in range(0,len(sua),500):
+        lpost(ltok,f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_XK}/records/batch_update',
+              {'records':sua[i:i+500]})
+    print('  Gia công: giữ nguyên %d dòng cũ (%d dòng nhập tay) | thêm %d | sửa số %d | không xoá dòng nào'
+          %(len(cu),len(tay),len(them),len(sua)))
+    return len(them)+len(sua)
+
 def gbtoken():
     body=urllib.parse.urlencode({'grant_type':'client_credentials','client_id':GCID,'client_secret':GSEC}).encode()
     return json.load(gopen(urllib.request.Request(GB+'/oauth/token',data=body,headers={'Accept':'application/json'}),30))['access_token']
@@ -177,11 +213,12 @@ def sync_gobox(ltok):
         if a65: print('  + Kho Mê Linh (GB65):',len(a65),'GSKU /',int(sum(a65.values())),'đv')
     except Exception as e: print('  kho65 skip:',e)
     # Bước 1 (Xuất Bán hàng ML2) GIỜ lấy từ Gobox MLP ở trên — KHÔNG dùng Section 1A nữa.
-    # Bước 2: Section 1B -> ML2 Xuất Gia công
+    # Bước 2: Section 1B -> ML2 Xuất Gia công (đi đường riêng, KHÔNG xoá dòng nào)
+    gc_recs=[]
     for sku,name,qty in s1b:
         g=sku2g.get(sku.lower()) or name2g.get(_norm(name))
         if not g: unmapped.append(('1B',sku,name,qty)); continue
-        if qty>0: xk_recs.append({'Ngày đóng gói':DATE_MS,'G SKU':str(g),'Số lượng':int(qty),'Kho xuất':'Kho Mê Linh 2','Loại':'Xuất Gia công'})
+        if qty>0: gc_recs.append({'Ngày đóng gói':DATE_MS,'G SKU':str(g),'Số lượng':int(qty),'Kho xuất':'Kho Mê Linh 2','Loại':'Xuất Gia công'})
     # Bước 4: Section 2 -Đã dùng -> ML2 Xuất Bán hàng, G SKU=SKU combo
     for sku,name,dau,gc,used,left in s2:
         if used<0: xk_recs.append({'Ngày đóng gói':DATE_MS,'G SKU':sku,'Số lượng':int(abs(used)),'Kho xuất':'Kho Mê Linh 2','Loại':'Xuất Bán hàng'})
@@ -193,20 +230,33 @@ def sync_gobox(ltok):
         if not opt: unmapped.append(('S2+GC',sku,name,gc)); continue
         ck_recs.append({'Ngày':DATE_MS,'Loại nhập kho':'Nhập combo','Tên SP':opt,'Số lượng':int(gc),'Kho nhập':'Mê Linh 2'})
     # --- Dedup + ghi Xuất kho (xoá hết record ngày này) ---
-    _SYNC_LOAI={'Xuất Bán hàng','Xuất Gia công'}  # chi xoa loai do sync tao; GIU manual (Xuat luu kho, Xuat Huy hang)
-    ex=[it['record_id'] for it in lsearch(ltok,T_XK,['Ngày đóng gói','Loại','Ghi chú'])
-        if it['fields'].get('Ngày đóng gói')==DATE_MS and gt(it['fields'].get('Loại')) in _SYNC_LOAI
-        and not is_gop(it['fields'])]   # KHONG xoa dong tong thang
+    # CHI xoa-ghi lai loai 'Xuất Bán hàng'. Moi loai khac (Gia cong, luu kho, huy hang,
+    # dong Box) KHONG BAO GIO bi xoa. Rieng Gia cong do sync_giacong() lo, chi them/sua.
+    _SYNC_LOAI={'Xuất Bán hàng'}
+    _cand=[it for it in lsearch(ltok,T_XK,['Ngày đóng gói','Loại','Ghi chú'],meta=True)
+           if it['fields'].get('Ngày đóng gói')==DATE_MS and gt(it['fields'].get('Loại')) in _SYNC_LOAI
+           and not is_gop(it['fields'])]   # KHONG xoa dong tong thang
+    _tay=[it for it in _cand if not is_auto(it)]
+    if _tay: print('  giữ nguyên %d dòng nhập tay:'%len(_tay),
+                   [(gt(i['fields'].get('Loại')),gt(i['fields'].get('G SKU'))) for i in _tay[:8]])
+    ex=[it['record_id'] for it in _cand if is_auto(it)]
+    # Neu doc duoc ung vien ma khong nhan ra dong nao cua bot -> rat co the created_by
+    # khong ve (sai SYNC_CREATOR_ID / API doi). Khi do KHONG xoa gi, se sinh dong trung.
+    if _cand and not ex:
+        print('  !! CANH BAO: %d dòng ứng viên nhưng không nhận ra dòng nào do bot tạo '
+              '-> không xoá gì, có thể trùng dòng. Kiểm tra SYNC_CREATOR_ID.'%len(_cand))
     for i in range(0,len(ex),500): lpost(ltok,f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_XK}/records/batch_delete',{'records':ex[i:i+500]})
     for i in range(0,len(xk_recs),500): lpost(ltok,f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_XK}/records/batch_create',{'records':[{'fields':r} for r in xk_recs[i:i+500]]})
+    gc_n=sync_giacong(ltok,DATE_MS,gc_recs)
     # --- Dedup + ghi Chuyển kho (chỉ Nhập combo ngày này) ---
-    exc=[it['record_id'] for it in lsearch(ltok,T_CK,['Ngày','Loại nhập kho']) if it['fields'].get('Ngày')==DATE_MS and it['fields'].get('Loại nhập kho')=='Nhập combo']
+    exc=[it['record_id'] for it in lsearch(ltok,T_CK,['Ngày','Loại nhập kho'],meta=True)
+         if it['fields'].get('Ngày')==DATE_MS and it['fields'].get('Loại nhập kho')=='Nhập combo' and is_auto(it)]
     for i in range(0,len(exc),500): lpost(ltok,f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_CK}/records/batch_delete',{'records':exc[i:i+500]})
     for i in range(0,len(ck_recs),500): lpost(ltok,f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_CK}/records/batch_create',{'records':[{'fields':r} for r in ck_recs[i:i+500]]})
     auco_n=sum(1 for q in auco.values() if q>0); ml2_n=len(xk_recs)-auco_n
-    print(f'  ÂuCơ={auco_n} | ML2={ml2_n} rec | ChuyểnKho(NhậpCombo)={len(ck_recs)} rec | chưa map={len(unmapped)}')
+    print(f'  ÂuCơ={auco_n} | ML2={ml2_n} rec | GiaCông={gc_n} rec | ChuyểnKho(NhậpCombo)={len(ck_recs)} rec | chưa map={len(unmapped)}')
     if unmapped: print('  chưa map:',unmapped[:10])
-    return NGAY,{'status':'done','auco':auco_n,'ml2':ml2_n,'ck':len(ck_recs),'unmapped':len(unmapped),'total':len(xk_recs)+len(ck_recs)}
+    return NGAY,{'status':'done','auco':auco_n,'ml2':ml2_n,'ck':len(ck_recs),'unmapped':len(unmapped),'total':len(xk_recs)+len(ck_recs)+gc_n}
 
 
 def _list_tables(tok):
@@ -522,7 +572,8 @@ def sync_hanghoan(ltok,ngay):
         g=sku2g.get(sk)
         if not g: un+=1; continue
         if q>0: recs.append({'Ngày đóng gói':DATE_MS,'G SKU':str(g),'Số lượng':int(q),'Ghi chú':'Hàng hoàn (Gobox)'})
-    ex=[it['record_id'] for it in lsearch(ltok,T_HOAN,['Ngày đóng gói']) if it['fields'].get('Ngày đóng gói')==DATE_MS]
+    ex=[it['record_id'] for it in lsearch(ltok,T_HOAN,['Ngày đóng gói'],meta=True)
+        if it['fields'].get('Ngày đóng gói')==DATE_MS and is_auto(it)]
     for i in range(0,len(ex),500): lpost(ltok,f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_HOAN}/records/batch_delete',{'records':ex[i:i+500]})
     for i in range(0,len(recs),500): lpost(ltok,f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_HOAN}/records/batch_create',{'records':[{'fields':x} for x in recs[i:i+500]]})
     print('  Hàng hoàn %s: %d SKU / %d sp (xoá cũ %d, chưa map %d)'%(ngay,len(recs),int(sum(x['Số lượng'] for x in recs)),len(ex),un))
