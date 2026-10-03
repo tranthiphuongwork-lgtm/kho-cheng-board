@@ -39,7 +39,7 @@ for r in lines:
 s1a, s1b, s2 = M.parse_report(NGAY)
 sku2g, sku2name, name2g = M._t2g_maps(ltok)
 tensp = M._ck_tensp(ltok)
-unmapped = []; xk_recs = []
+unmapped = []; xk_recs = []; gc_recs = []
 
 for g, q in auco.items():
     if q > 0: xk_recs.append({'Ngày đóng gói': DATE_MS, 'G SKU': str(g), 'Số lượng': int(q),
@@ -65,7 +65,7 @@ except Exception as e:
 for sku, name, qty in s1b:
     g = sku2g.get(sku.lower()) or name2g.get(M._norm(name))
     if not g: unmapped.append(('1B', sku, name, qty)); continue
-    if qty > 0: xk_recs.append({'Ngày đóng gói': DATE_MS, 'G SKU': str(g), 'Số lượng': int(qty),
+    if qty > 0: gc_recs.append({'Ngày đóng gói': DATE_MS, 'G SKU': str(g), 'Số lượng': int(qty),
                                 'Kho xuất': 'Kho Mê Linh 2', 'Loại': 'Xuất Gia công'})
 # Section 2 (-Đã dùng) -> Xuất Bán hàng
 for sku, name, dau, gc, used, left in s2:
@@ -81,10 +81,14 @@ for sku, name, dau, gc, used, left in s2:
                     'Số lượng': int(gc), 'Kho nhập': 'Mê Linh 2'})
 
 # --- Xoá bản ghi cũ của ĐÚNG ngày đó rồi ghi lại ---
-_SYNC_LOAI = {'Xuất Bán hàng', 'Xuất Gia công'}
-ex = [it['record_id'] for it in M.lsearch(ltok, M.T_XK, ['Ngày đóng gói', 'Loại', 'Ghi chú'])
-      if it['fields'].get('Ngày đóng gói') == DATE_MS and M.gt(it['fields'].get('Loại')) in _SYNC_LOAI
-      and not M.is_gop(it['fields'])]   # KHONG xoa dong tong thang: chay bu ngay cuoi thang se mat ca thang
+# CHI xoa-ghi lai 'Xuất Bán hàng'. Gia cong di duong rieng: chi them/sua, khong xoa.
+_SYNC_LOAI = {'Xuất Bán hàng'}
+_cand = [it for it in M.lsearch(ltok, M.T_XK, ['Ngày đóng gói', 'Loại', 'Ghi chú'], meta=True)
+         if it['fields'].get('Ngày đóng gói') == DATE_MS and M.gt(it['fields'].get('Loại')) in _SYNC_LOAI
+         and not M.is_gop(it['fields'])]   # KHONG xoa dong tong thang: chay bu ngay cuoi thang se mat ca thang
+_tay = [it for it in _cand if not M.is_auto(it)]
+if _tay: print('  giữ nguyên %d dòng nhập tay' % len(_tay))
+ex = [it['record_id'] for it in _cand if M.is_auto(it)]   # chi xoa dong do bot tao
 for i in range(0, len(ex), 500):
     M.lpost(ltok, f'/open-apis/bitable/v1/apps/{M.BASE}/tables/{M.T_XK}/records/batch_delete',
             {'records': ex[i:i+500]})
@@ -98,9 +102,11 @@ for i in range(0, len(xk_recs), 500):
         print('     record mẫu:', xk_recs[i])
     else:
         wrote_xk += len(d.get('data', {}).get('records', []))
+M.sync_giacong(ltok, DATE_MS, gc_recs)   # them/sua, KHONG xoa dong Gia cong nao
 
-exc = [it['record_id'] for it in M.lsearch(ltok, M.T_CK, ['Ngày', 'Loại nhập kho'])
-       if it['fields'].get('Ngày') == DATE_MS and it['fields'].get('Loại nhập kho') == 'Nhập combo']
+exc = [it['record_id'] for it in M.lsearch(ltok, M.T_CK, ['Ngày', 'Loại nhập kho'], meta=True)
+       if it['fields'].get('Ngày') == DATE_MS and it['fields'].get('Loại nhập kho') == 'Nhập combo'
+       and M.is_auto(it)]
 for i in range(0, len(exc), 500):
     M.lpost(ltok, f'/open-apis/bitable/v1/apps/{M.BASE}/tables/{M.T_CK}/records/batch_delete',
             {'records': exc[i:i+500]})
