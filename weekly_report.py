@@ -26,10 +26,21 @@ BOT_URL=(os.getenv('LARK_BOT_URL') or 'https://larkbot-laj5.onrender.com').rstri
 BOT_TOKEN=(os.getenv('LARK_VERIFY_TOKEN') or '').strip()
 
 def _norm(s): return re.sub(r'\s+',' ',(s or '').strip()).lower()
+def is_2ml(name):
+    """Hang 2ml chi de TANG KEM, khong tinh la hang ban -> bo khoi bao cao.
+    Chi nhan dung '2ml'; 10ml / 30ml / 100ml / 120ml van duoc giu lai."""
+    n=_norm(name).replace(' ','')
+    i=n.find('2ml')
+    while i!=-1:
+        if i==0 or not n[i-1].isdigit(): return True
+        i=n.find('2ml',i+1)
+    return False
 def kalle_alert_ok(name,hang):
+    if is_2ml(name): return False
     if (hang or '').strip()!='Kalle': return True
     n=_norm(name); return any(k in n for k in KALLE_KEEP)
 def kalle_top_ok(name):
+    if is_2ml(name): return False
     n=_norm(name); return not any(k in n for k in KALLE_TOP_SKIP)
 def ltoken():
     r=urllib.request.Request(LARK_HOST+'/open-apis/auth/v3/tenant_access_token/internal',
@@ -282,7 +293,8 @@ def main():
     rate=lambda g:s14.get(g,0)/ND14
     dleft=lambda g:(round(inv[g]['ton']/rate(g),1) if rate(g)>0 else None)
     chg=[{'name':inv[g]['name'],'qty':int(per[g]),'ton':int(inv[g]['ton']),'rate':round(rate(g),1),'days':dleft(g)}
-         for g in sorted(per,key=lambda x:-per[x]) if inv.get(g,{}).get('hang')=='Cheng' and inv.get(g,{}).get('pl') in DYE_PL][:10]
+         for g in sorted(per,key=lambda x:-per[x]) if inv.get(g,{}).get('hang')=='Cheng'
+         and inv.get(g,{}).get('pl') in DYE_PL and not is_2ml(inv.get(g,{}).get('name'))][:10]
     kal=[{'name':inv[g]['name'],'qty':int(per[g]),'ton':int(inv[g]['ton']),'rate':round(rate(g),1),'days':dleft(g)}
          for g in sorted(per,key=lambda x:-per[x])
          if inv.get(g,{}).get('hang')=='Kalle' and kalle_top_ok(inv.get(g,{}).get('name'))][:10]
