@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Tạo tem kiện — Cheng</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   *{box-sizing:border-box}
   body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f4f6fb;color:#1f2933;margin:0;padding:18px;max-width:1180px;margin:0 auto}
@@ -22,7 +23,8 @@
   table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(16,24,40,.06)}
   th{background:#2E75B6;color:#fff;font-size:12px;padding:9px 6px;text-align:left}
   td{border-bottom:1px solid #eef0f4;padding:6px 6px;vertical-align:middle}
-  td input{width:100%;padding:7px;border:1px solid #cbd2dd;border-radius:7px;font-size:14px}
+    td input{width:100%;padding:7px;border:1px solid #cbd2dd;border-radius:7px;font-size:14px}
+  td select{width:100%;padding:7px;border:1px solid #cbd2dd;border-radius:7px;font-size:14px;background:#fff}
   td.num input{text-align:right}
   td .ma{font-size:11px;color:#98a2b3;margin-top:3px;min-height:13px}
   td .ma.bad{color:#c0392b}
@@ -32,6 +34,8 @@
   .add{background:#eaf1fb;color:#1F4E78}
   .gen{background:#138d75;color:#fff}
   .btn.slip{background:#2E75B6;color:#fff}
+    .btn.xls{background:#1D6F42;color:#fff}
+    .btn.lark{background:#5B46D9;color:#fff}
   .hint{color:#98a2b3;font-size:12px;margin-top:6px}
   .hint b{color:#475467}
 
@@ -134,7 +138,18 @@
     </div>
   </div>
 
-  <datalist id="prods"></datalist>
+  <div class="cfg">
+      <label>Đơn vị tính — danh sách
+        <select id="dvtsel"></select>
+      </label>
+      <div class="khman" style="margin-left:0">
+        <input id="newdvt" placeholder="ĐVT mới..." onkeydown="if(event.key===\'Enter\'){addDvt();return false;}">
+        <button type="button" class="kadd" onclick="addDvt()">➕ Thêm ĐVT</button>
+        <button type="button" class="kdel" onclick="delDvt()" title="Xóa ĐVT đang chọn trong danh sách">✕ Xóa ĐVT</button>
+      </div>
+    </div>
+
+    <datalist id="prods"></datalist>
 
   <table>
     <thead>
@@ -158,6 +173,8 @@
     <button class="btn add" onclick="addRow()">➕ Thêm dòng</button>
     <button class="btn gen" onclick="genTem()">🏷️ In tem A6</button>
     <button class="btn slip" id="btnPhieu" onclick="genPhieu()">📄 In phiếu xuất kho A4</button>
+      <button class="btn xls" onclick="xuatExcel()">⤓ Xuất Excel (SKU + SL)</button>
+      <button class="btn lark" id="btnLark" onclick="ghiLark()">📥 Ghi vào Chuyển kho (Lark)</button>
   </div>
   <div class="hint">
     <b>ĐVT = Thùng</b> → thùng nguyên: Số lượng là số thùng, in 1 tem/thùng (mỗi thùng 1 mã). &nbsp;
@@ -188,6 +205,53 @@ function applyCatalog(){
 }
 
 /* ====== Quản lý danh sách kho (dropdown, thêm/xóa, lưu localStorage) ====== */
+/* ===== Đơn vị tính: danh sách chọn, thêm/xoá được, nhớ trong máy ===== */
+var DVT_DEFAULT = ['Thùng','Cái','Hộp','Lọ','Túi','Tuýp','Chai','Gói','Đôi','Bộ'];
+function loadDvt(){
+  try{ var s=JSON.parse(localStorage.getItem('dvtList')); if(Array.isArray(s)&&s.length) return s; }catch(e){}
+  return DVT_DEFAULT.slice();
+}
+function saveDvt(){ try{ localStorage.setItem('dvtList', JSON.stringify(DVTS)); }catch(e){} }
+var DVTS = loadDvt();
+
+/* Đổ danh sách vào 1 ô chọn. Giữ lại giá trị cũ kể cả khi nó đã bị xoá khỏi danh sách,
+   để dòng đang nhập dở không bị nhảy sang đơn vị khác. */
+function fillDvt(sel, keep){
+  var cur = keep || sel.value || 'Thùng';
+  var ds = DVTS.slice();
+  if(cur && ds.indexOf(cur) < 0) ds.unshift(cur);
+  sel.innerHTML='';
+  ds.forEach(function(d){ var o=document.createElement('option'); o.value=d; o.textContent=d; sel.appendChild(o); });
+  sel.value = cur;
+}
+function renderDvt(){
+  var box=document.getElementById('dvtsel');
+  if(box){
+    var keep=box.value;
+    box.innerHTML='';
+    DVTS.forEach(function(d){ var o=document.createElement('option'); o.value=d; o.textContent=d; box.appendChild(o); });
+    if(DVTS.indexOf(keep)>=0) box.value=keep;
+  }
+  document.querySelectorAll('#rows .c-dvt').forEach(function(sel){ fillDvt(sel, sel.value); });
+}
+function addDvt(){
+  var el=document.getElementById('newdvt'), v=el.value.trim();
+  if(!v) return;
+  if(DVTS.indexOf(v)<0){ DVTS.push(v); saveDvt(); }
+  el.value='';
+  renderDvt();
+  document.getElementById('dvtsel').value=v;
+}
+function delDvt(){
+  var v=document.getElementById('dvtsel').value;
+  if(!v) return;
+  if(DVTS.length<=1){ alert('Phải còn ít nhất 1 đơn vị tính.'); return; }
+  if(!confirm('Xóa đơn vị tính "'+v+'" khỏi danh sách?\n(Các dòng đang dùng đơn vị này vẫn giữ nguyên.)')) return;
+  DVTS=DVTS.filter(function(d){ return d!==v; });
+  saveDvt();
+  renderDvt();
+}
+
 var KHO_DEFAULT = ['Mê Linh 1','Mê Linh 2','Âu Cơ','Sài Gòn','Hà Nội'];
 function loadKho(){
   try{ var s=JSON.parse(localStorage.getItem('khoList')); if(Array.isArray(s)&&s.length) return s; }catch(e){}
@@ -224,7 +288,74 @@ function delKho(){
 }
 function togglePhieu(){
   var s=document.getElementById('src').value.trim();
-  document.getElementById('btnPhieu').style.display=(s && s!=='Sài Gòn')?'':'none';
+  var hien=(s && s!=='Sài Gòn')?'':'none';
+  document.getElementById('btnPhieu').style.display=hien;
+  var bl=document.getElementById('btnLark'); if(bl) bl.style.display=hien;
+}
+
+/* ===== Ghi phiếu chuyển kho vào Lark =====
+   Trang này là web tĩnh công khai nên KHÔNG chứa khoá Lark.
+   Nó gọi sang bot trên Render — nơi giữ khoá — kèm mã truy cập do người dùng nhập 1 lần. */
+var BOT = 'https://larkbot-laj5.onrender.com';
+
+function botToken(){
+  var t='';
+  try{ t=localStorage.getItem('botToken')||''; }catch(e){}
+  if(!t){
+    t=prompt('Nhập mã truy cập bot (hỏi Phương). Chỉ phải nhập 1 lần trên máy này:')||'';
+    t=t.trim();
+    if(t){ try{ localStorage.setItem('botToken',t); }catch(e){} }
+  }
+  return t;
+}
+
+function ghiLark(){
+  var src=document.getElementById('src').value.trim();
+  var dst=document.getElementById('dst').value.trim();
+  if(!src || src==='Sài Gòn'){ alert('Chỉ ghi được khi Kho xuất khác Sài Gòn.'); return; }
+  if(src===dst){ alert('Kho xuất và Kho nhập đang trùng nhau.'); return; }
+
+  var rows=[];
+  document.querySelectorAll('#rows tr').forEach(function(tr){
+    var ten=tr.querySelector('.c-ten').value.trim();
+    var sl=parseInt(tr.querySelector('.c-sl').value,10)||0;
+    if(!ten||sl<=0) return;
+    rows.push({ten:ten, dvt:tr.querySelector('.c-dvt').value.trim(),
+               sl:sl, gc:tr.querySelector('.c-gc').value.trim()});
+  });
+  if(!rows.length){ alert('Chưa có dòng hợp lệ để ghi.'); return; }
+
+  var d=new Date(), z=function(x){return ('0'+x).slice(-2);};
+  var ngay=d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate());
+  if(!confirm('Ghi '+rows.length+' dòng vào bảng Chuyển kho trên Lark?\n'+
+              src+' → '+dst+' , ngày '+z(d.getDate())+'/'+z(d.getMonth()+1)+'/'+d.getFullYear())) return;
+
+  var tok=botToken();
+  if(!tok){ alert('Chưa có mã truy cập, chưa ghi gì cả.'); return; }
+
+  var btn=document.getElementById('btnLark'), nhan=btn.textContent;
+  btn.disabled=true; btn.textContent='Đang ghi...';
+  fetch(BOT+'/tem-chuyen-kho?token='+encodeURIComponent(tok), {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ngay:ngay, kho_xuat:src, kho_nhap:dst,
+                         ghi_chu:'Tem kiện '+z(d.getDate())+'/'+z(d.getMonth()+1), rows:rows})
+  }).then(function(r){ return r.json().catch(function(){ return {ok:false,err:'Bot trả về không phải JSON (HTTP '+r.status+')'}; }); })
+    .then(function(j){
+      btn.disabled=false; btn.textContent=nhan;
+      if(!j.ok){
+        if((j.err||'').indexOf('token')>=0){ try{ localStorage.removeItem('botToken'); }catch(e){} }
+        alert('Không ghi được:\n'+(j.err||'không rõ lỗi')); return;
+      }
+      var m='Đã ghi '+j.ghi+' dòng vào bảng Chuyển kho ('+j.kho_xuat+' → '+j.kho_nhap+').';
+      if(j.tin==='da gui') m+=' Đã báo nhóm Bot của Phương.';
+      else if(j.tin && j.tin.indexOf('loi:')===0) m+=' Nhưng KHÔNG gửi được tin nhóm — '+j.tin.slice(4);
+      if(j.bo_qua && j.bo_qua.length) m+='\n\nBỏ qua '+j.bo_qua.length+' dòng:\n- '+j.bo_qua.join('\n- ');
+      alert(m);
+    })
+    .catch(function(e){
+      btn.disabled=false; btn.textContent=nhan;
+      alert('Không gọi được bot: '+e+'\nBot trên Render có thể đang ngủ, thử lại sau 30 giây.');
+    });
 }
 function toggleLotCols(){
   var show=document.getElementById('src').value.trim()==='Sài Gòn';
@@ -279,7 +410,7 @@ function addRow(v){
   var tr=document.createElement('tr');
   tr.innerHTML=
     '<td><input class="c-ten" list="prods" placeholder="Gõ để tìm..." value="'+(v.ten||'')+'" oninput="onTen(this)"><div class="ma"></div></td>'+
-    '<td><input class="c-dvt" value="'+(v.dvt||'Thùng')+'"></td>'+
+    '<td><select class="c-dvt"></select></td>'+
     '<td><input class="c-qc" placeholder="Vd: 45 hộp/thùng" value="'+(v.qc||'')+'"></td>'+
     '<td><input class="c-dt" placeholder="Vd: 30ml" value="'+(v.dt||'')+'"></td>'+
     '<td class="col-lot"><input class="c-lo" placeholder="Số lô" value="'+(v.lo||'')+'"></td>'+
@@ -289,6 +420,7 @@ function addRow(v){
     '<td><input class="c-grp" placeholder="vd: A" value="'+(v.grp||'')+'"></td>'+
     '<td style="text-align:center"><button class="del" onclick="this.closest(\'tr\').remove()">✕</button></td>';
   document.getElementById('rows').appendChild(tr);
+  fillDvt(tr.querySelector('.c-dvt'), v.dvt||'Thùng');
   if(v.ten) onTen(tr.querySelector('.c-ten'));
   toggleLotCols();
 }
@@ -416,6 +548,56 @@ function genTem(){
 
 /* ====== Phiếu xuất kho A4 (giống lệnh chuyển kho) ====== */
 function vnnum(n){ try{ return Number(n).toLocaleString('vi-VN'); }catch(e){ return String(n); } }
+/* ===== Xuất Excel: SKU + số lượng quy về đơn vị nhỏ nhất =====
+   Quy tắc: ĐVT = Thùng  -> nhân với số trong Quy cách ("48 hộp/thùng" -> x48).
+            ĐVT khác     -> giữ nguyên, vì đã là đơn vị lẻ.
+   Trùng SKU ở nhiều dòng thì cộng dồn. */
+function qcSo(qc){ var m=/^\s*(\d+)/.exec(qc||''); return m?parseInt(m[1],10):0; }
+
+function gomSKU(){
+  var thuTu=[], qty={}, bad=[], khongQD=[];
+  document.querySelectorAll('#rows tr').forEach(function(tr){
+    var ten=tr.querySelector('.c-ten').value.trim();
+    var dvt=tr.querySelector('.c-dvt').value.trim()||'Thùng';
+    var qc=tr.querySelector('.c-qc').value.trim();
+    var sl=parseInt(tr.querySelector('.c-sl').value,10)||0;
+    if(!ten||sl<=0) return;
+    var m=MAP[norm(ten)];
+    if(!m){ bad.push(ten); return; }
+    var sku=((m.s||'').trim())||((m.g||'').trim())||m.t;
+    var so=qcSo(qc), slNho;
+    if(norm(dvt)==='thùng'){
+      if(so>0){ slNho=sl*so; }
+      else { slNho=sl; khongQD.push(m.t+' — '+sl+' thùng, chưa có quy cách'); }
+    }else{
+      slNho=sl;
+    }
+    if(qty[sku]==null){ qty[sku]=0; thuTu.push(sku); }
+    qty[sku]+=slNho;
+  });
+  return {thuTu:thuTu, qty:qty, bad:bad, khongQD:khongQD};
+}
+
+function xuatExcel(){
+  if(typeof XLSX==='undefined'){ alert('Chưa tải được thư viện Excel. Kiểm tra mạng rồi tải lại trang.'); return; }
+  var r=gomSKU();
+  if(r.bad.length){
+    if(!confirm('Các dòng CHƯA khớp danh mục (sẽ bỏ qua):\n- '+r.bad.join('\n- ')+'\n\nVẫn xuất file?')) return;
+  }
+  if(!r.thuTu.length){ alert('Chưa có dòng hợp lệ (Tên phải chọn trong danh mục, Số lượng ≥ 1).'); return; }
+  if(r.khongQD.length){
+    alert('Các dòng sau ĐVT là Thùng nhưng chưa có Quy cách nên GIỮ NGUYÊN số thùng:\n- '+r.khongQD.join('\n- '));
+  }
+  var aoa=[['SKU','Số lượng']];
+  r.thuTu.forEach(function(k){ aoa.push([k, r.qty[k]]); });
+  var ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:24},{wch:12}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'SKU');
+  var d=new Date(), z=function(x){return ('0'+x).slice(-2);};
+  XLSX.writeFile(wb, 'sku_'+d.getFullYear()+z(d.getMonth()+1)+z(d.getDate())+'_'+z(d.getHours())+z(d.getMinutes())+'.xlsx');
+}
+
 function genPhieu(){
   var src=document.getElementById('src').value.trim(), dst=document.getElementById('dst').value.trim();
   var trs=document.querySelectorAll('#rows tr'); var rows=[]; var bad=[];
@@ -465,6 +647,7 @@ function genPhieu(){
 
 // khởi tạo dropdown kho + danh mục + dòng mẫu
 renderKho();
+renderDvt();
 applyCatalog();
 toggleLotCols();
 addRow({ten:'Hũ ủ hồng ziemlich (hộp)',dvt:'Thùng',qc:'45 hộp/thùng',sl:5});
