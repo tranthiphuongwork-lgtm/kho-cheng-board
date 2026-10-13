@@ -1,0 +1,37 @@
+name: Ghi Xuat luu kho PL -> sot (Au Co)
+on:
+  schedule:
+    # 11:30 UTC = 18:30 VN — cuoi gio kho, truoc job tong hop ton
+    - cron: '30 11 * * *'
+  workflow_dispatch:
+    inputs:
+      ngay_tu:
+        description: 'Tu ngay YYYY-MM-DD (de trong = hom nay). Dat de bu lich su.'
+        default: ''
+      ngay_den:
+        description: 'Den ngay YYYY-MM-DD (de trong = hom nay)'
+        default: ''
+      dry_run:
+        description: 'De 1 neu chi xem log, khong ghi vao Lark'
+        default: '1'
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Ghi Xuat luu kho
+        env:
+          LARK_APP_ID: ${{ secrets.LARK_APP_ID }}
+          LARK_APP_SECRET: ${{ secrets.LARK_APP_SECRET }}
+          LARK_APP_TOKEN: ${{ secrets.LARK_APP_TOKEN }}
+          # Chi dung API MO cua Gobox -> KHONG can GOBOX_WEB_TOKEN,
+          # nen job nay khong chet theo han token phien ERP.
+          NGAY_TU: ${{ github.event.inputs.ngay_tu }}
+          NGAY_DEN: ${{ github.event.inputs.ngay_den }}
+          # Chay theo lich: inputs rong -> '0' -> GHI THAT.
+          # Bam tay: o nhap mac dinh '1' -> chay kho, phai tu doi thanh 0.
+          DRY_RUN: ${{ github.event.inputs.dry_run || '0' }}
+        run: python xuat_luu_kho.py
