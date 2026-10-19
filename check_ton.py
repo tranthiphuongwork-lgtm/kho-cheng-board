@@ -73,7 +73,7 @@ items, pt = [], None
 while True:
     u = LARK_HOST + f'/open-apis/bitable/v1/apps/{BASE}/tables/{T_SP}/records/search?page_size=500'
     if pt: u += '&page_token=' + pt
-    d, e = req(u, json.dumps({'field_names': ['G SKU', 'SKU', 'Tên sản phẩm',
+    d, e = req(u, json.dumps({'field_names': ['G SKU', 'SKU', 'Tên sản phẩm', 'Hãng',
                                               'Tồn kho Âu Cơ', 'Kho Mê Linh 1', 'Kho Mê Linh 2']}).encode(), LH)
     if e: raise SystemExit('Đọc Tổng sản phẩm lỗi: ' + e)
     d = d['data']; items += d.get('items', [])
@@ -85,10 +85,15 @@ for it in items:
     f = it['fields']
     sku = gt(f.get('SKU')).strip()
     if not sku: continue
+    # Mot SKU co the nam o nhieu dong (dong trung duoi "Combo Cheng" de trong Hang)
+    # -> giu lai gia tri Hang dau tien tim duoc, khong de dong trong ghi de.
+    cu = lark.get(sku) or {}
     lark[sku] = {'ten': gt(f.get('Tên sản phẩm')) or sku,
+                 'hang': gt(f.get('Hãng')).strip() or cu.get('hang', ''),
                  32: fv(f.get('Tồn kho Âu Cơ')),
                  65: fv(f.get('Kho Mê Linh 1')) + fv(f.get('Kho Mê Linh 2'))}
-print('Lark: %d mã có SKU' % len(lark))
+print('Lark: %d mã có SKU | %d mã có hãng'
+      % (len(lark), sum(1 for v in lark.values() if v['hang'])))
 
 # ---------------- Gobox ----------------
 d, e = req(GB + '/oauth/token',
@@ -135,7 +140,8 @@ for ten, ms in NHOM:
     co = [m for m in ms if m in lark and m in gobox]
     if not co: continue
     trong_nhom.update(ms)
-    units.append(('+'.join(co), {'ten': ten},
+    hg = {lark[m].get('hang', '') for m in co}
+    units.append(('+'.join(co), {'ten': ten, 'hang': hg.pop() if len(hg) == 1 else ''},
                   {32: sum(lark[m][32] for m in co), 65: sum(lark[m][65] for m in co)},
                   {32: sum(gobox[m][32] for m in co), 65: sum(gobox[m][65] for m in co)}))
 for sku, L in lark.items():
@@ -160,7 +166,7 @@ now = datetime.datetime.now(VN)
 
 def hang(r, nhom):
     ma, L, G, d32, d65 = r
-    return {'ma': ma, 'ten': L['ten'], 'nhom': nhom,
+    return {'ma': ma, 'ten': L['ten'], 'hg': L.get('hang', ''), 'nhom': nhom,
             'acg': int(G[32]), 'acl': int(L[32]), 'acd': int(d32),
             'mlg': int(G[65]), 'mll': int(L[65]), 'mld': int(d65)}
 
@@ -170,6 +176,7 @@ thieu = sorted(s for s in lark if s not in gobox and s not in trong_nhom)
 am = [r for r in rows if r['acl'] < 0 or r['mll'] < 0]
 meta = {'ngay': now.strftime('%d/%m/%Y %H:%M'), 'sosanh': sosanh, 'ca_hai': len(ca_hai),
         'mot_kho': len(mot_kho), 'nguong': MIN_LECH, 'am': len(am),
+        'hangs': sorted({r['hg'] for r in rows if r['hg']}),
         'thieu': thieu, 'rows': rows}
 
 TPL = """<!doctype html><html lang="vi"><head><meta charset="utf-8">
@@ -219,6 +226,8 @@ tbody tr:hover{background:#f9fafb}
 .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;
      background:#fef3c7;color:#92400e;margin-left:6px}
 .tag.one{background:#e0e7ff;color:#3730a3}
+.tag.hg{background:#dcfce7;color:#166534}
+.tag.hg.kalle{background:#fae8ff;color:#86198f}
 .note{color:var(--mut);font-size:12.5px;margin:14px 0 0;line-height:1.7}
 .sep{border-top:1px solid var(--line);margin:22px 0 14px;padding-top:14px}
 h2{font-size:14px;margin:0 0 8px;color:var(--mut);text-transform:uppercase;letter-spacing:.3px}
@@ -237,6 +246,9 @@ h2{font-size:14px;margin:0 0 8px;color:var(--mut);text-transform:uppercase;lette
     <option value="ac">Lệch kho Âu Cơ</option>
     <option value="ml">Lệch kho Mê Linh</option>
     <option value="neg">Chỉ mã tồn Lark âm</option>
+  </select>
+  <select id="fh">
+    <option value="all">Tất cả hãng</option>
   </select>
 </div>
 <div class="box"><table>
@@ -263,6 +275,11 @@ document.getElementById('tiles').innerHTML = [
 ].map(t => '<div class="tile"><b class="' + t[2] + '">' + n(t[1]) +
      '</b><span>' + t[0] + '</span></div>').join('');
 
+const selH = document.getElementById('fh');
+selH.insertAdjacentHTML('beforeend',
+  D.hangs.map(h => '<option value="' + h + '">' + h + '</option>').join('') +
+  '<option value="_">Chưa gán hãng</option>');
+
 const cell = (v, isDiff, kho) => {
   let c = kho;
   if (isDiff) c += v > 0 ? ' up' : (v < 0 ? ' down' : '');
@@ -272,7 +289,10 @@ const cell = (v, isDiff, kho) => {
 function draw() {
   const q = document.getElementById('q').value.trim().toLowerCase();
   const f = document.getElementById('f').value;
+  const fh = selH.value;
   let r = D.rows;
+  if (fh === '_') r = r.filter(x => !x.hg);
+  else if (fh !== 'all') r = r.filter(x => x.hg === fh);
   if (f === '2') r = r.filter(x => x.nhom === 2);
   else if (f === '1') r = r.filter(x => x.nhom === 1);
   else if (f === 'neg') r = r.filter(x => x.acl < 0 || x.mll < 0);
@@ -289,6 +309,8 @@ function draw() {
   tb.classList.toggle('an-ac', f === 'ml');
   document.getElementById('tb').innerHTML = r.map((x, i) =>
     '<tr><td>' + (i + 1) + '</td><td class="c1 ten">' + x.ten +
+    (x.hg ? '<span class="tag hg' + (x.hg === 'Kalle' ? ' kalle' : '') + '">' +
+            x.hg + '</span>' : '') +
     (x.nhom === 2 ? '<span class="tag">cả 2 kho</span>'
                   : '<span class="tag one">1 kho</span>') +
     '</td><td class="c1 ma">' + x.ma + '</td>' +
@@ -298,6 +320,7 @@ function draw() {
 }
 document.getElementById('q').addEventListener('input', draw);
 document.getElementById('f').addEventListener('change', draw);
+selH.addEventListener('change', draw);
 draw();
 if (D.thieu.length) document.getElementById('extra').innerHTML =
   '<div class="sep"><h2>' + D.thieu.length +
