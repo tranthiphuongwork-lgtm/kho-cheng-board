@@ -1,5 +1,5 @@
 <!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Báo cáo bán hàng 24/11/2026</title>
+<title>Báo cáo bán hàng 25/11/2026</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:#0f1729;color:#e6edf6;padding:18px;max-width:1100px;margin:0 auto}
@@ -30,7 +30,7 @@ body{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:#0f
 .empty{color:#7d8db0;font-size:13px;padding:8px}
 .foot{text-align:center;color:#5b6b8c;font-size:11px;margin-top:16px}
 </style></head><body>
-<div class="head"><h1>📊 Báo cáo bán hàng — Kho</h1><div class="sub">Ngày 24/11/2026 · Top bán chạy & cảnh báo sắp hết · tốc độ bán TB 2 tuần</div></div>
+<div class="head"><h1>📊 Báo cáo bán hàng — Kho</h1><div class="sub">Ngày 25/11/2026 · Top bán chạy & cảnh báo sắp hết · tốc độ bán TB 2 tuần</div></div>
 <div class="grid">
  <div class="card"><h2>🏆 Top bán chạy <span class="tag c">CHENG · thuốc nhuộm</span></h2><div id="cheng"></div></div>
  <div class="card"><h2>🏆 Top bán chạy <span class="tag k">KALLE</span></h2><div id="kalle"></div></div>
@@ -38,7 +38,7 @@ body{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:#0f
 <div class="card risk" style="margin-top:16px"><h2>⚠️ Sắp hết trong 1 tuần tới</h2><div class="empty" style="margin-bottom:6px">Tốc độ bán cao, tồn hiện không đủ bán 1 tuần — cần nhập thêm.</div><div id="risk"></div></div>
 <div class="foot">Tự động cập nhật sau mỗi lần xuất kho · Kho Cheng/Kalle</div>
 <script>
-var D={"date": "24/11/2026", "cheng": [], "kalle": [], "risk": [{"name": "Dầu gội khô 20ml (hộp)", "rate": 56.6, "ton": 80, "days": 1.4}]};
+var D={"date": "25/11/2026", "cheng": [{"name": "3 gói nhuộm bọt - trà lạnh (túi)", "qty": 138, "ton": 62784, "rate": 82.5, "days": 760.7}, {"name": "3 gói nhuộm bọt - nâu đen (túi)", "qty": 120, "ton": 40740, "rate": 76.8, "days": 530.2}, {"name": "3 gói nhuộm bọt - nâu sữa (túi)", "qty": 107, "ton": 17740, "rate": 54.3, "days": 326.7}, {"name": "3 gói nhuộm bọt - nâu lạnh (túi)", "qty": 102, "ton": 27811, "rate": 70.8, "days": 392.6}, {"name": "5 gói nhuộm bọt - nâu đen (hộp)", "qty": 101, "ton": 15280, "rate": 54.4, "days": 281.0}, {"name": "5 gói nhuộm bọt - trà lạnh (hộp)", "qty": 94, "ton": 26922, "rate": 57.6, "days": 467.3}, {"name": "3 gói nhuộm bọt - mocha (túi)", "qty": 89, "ton": 18919, "rate": 49.6, "days": 381.3}, {"name": "10 gói nhuộm bọt - mocha (hộp)", "qty": 82, "ton": 8977, "rate": 35.8, "days": 251.0}, {"name": "3 gói nhuộm bọt - nâu tây (túi)", "qty": 81, "ton": 13852, "rate": 47.9, "days": 289.0}, {"name": "3 gói nhuộm bọt - đen tuyền (túi)", "qty": 77, "ton": 15254, "rate": 44.2, "days": 345.5}], "kalle": [{"name": "Box Dark Beauty 30ml + Sữa tắm Dark Beauty", "qty": 43, "ton": 1373, "rate": 25.8, "days": 53.1}, {"name": "Vial 2ml ngẫu nhiên (cái)", "qty": 34, "ton": -121, "rate": 13.7, "days": -8.8}, {"name": "BST Vial Summer Breath (Dark Beauty + Venus + First Love)", "qty": 28, "ton": 6006, "rate": 16.8, "days": 356.5}, {"name": "Nước Hoa DARK BEAUTY - 10ML (lọ)", "qty": 24, "ton": 4643, "rate": 17.8, "days": 261.3}, {"name": "Nước Hoa DARK BEAUTY - 30ML (lọ)", "qty": 21, "ton": 8401, "rate": 13.3, "days": 631.3}, {"name": "1 gói sữa tắm ngẫu nhiên (tổng 3 gói/combo) (gói)", "qty": 21, "ton": 0, "rate": 8.3, "days": 0.0}, {"name": "Nước Hoa LADYKILLER - 30ML (lọ)", "qty": 10, "ton": 454, "rate": 15.0, "days": 30.3}, {"name": "Nước Hoa Blue Shirt - 2ML (lọ)", "qty": 9, "ton": 1640, "rate": 12.6, "days": 130.0}, {"name": "Nước Hoa LADYKILLER - 10ML (lọ)", "qty": 9, "ton": 3042, "rate": 12.6, "days": 241.1}, {"name": "Box Dark Beauty 10ml + Sữa tắm Dark Beauty", "qty": 8, "ton": 4986, "rate": 10.9, "days": 456.5}], "risk": []};
 function fmt(n){return n.toLocaleString('vi-VN')}
 function sellers(id,arr,cls){var el=document.getElementById(id);if(!arr.length){el.innerHTML='<div class=empty>Không có dữ liệu</div>';return}
  var mx=Math.max.apply(null,arr.map(function(x){return x.qty}))||1;
